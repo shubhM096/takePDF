@@ -35,23 +35,37 @@ function renderPreview() {
   if (captureData.format === 'pdf') {
     // Show sidebar for PDF
     sidebar.classList.add('visible');
-    // Use embed for PDF preview
+    // Convert base64 to Blob URL (data: URLs blocked by extension CSP)
+    const pdfBlob = base64ToBlob(captureData.base64, 'application/pdf');
+    const blobUrl = URL.createObjectURL(pdfBlob);
     const embed = document.createElement('embed');
-    embed.src = `data:application/pdf;base64,${captureData.base64}`;
+    embed.src = blobUrl;
     embed.type = 'application/pdf';
     embed.className = 'preview-embed';
     previewArea.appendChild(embed);
   } else {
     // Image preview
     sidebar.classList.remove('visible');
+    const imgBlob = base64ToBlob(captureData.base64, captureData.mimeType);
+    const blobUrl = URL.createObjectURL(imgBlob);
     const img = document.createElement('img');
-    img.src = `data:${captureData.mimeType};base64,${captureData.base64}`;
+    img.src = blobUrl;
     img.className = 'preview-image';
     img.alt = 'Captured screenshot';
     previewArea.appendChild(img);
   }
   
   loading.style.display = 'none';
+}
+
+// Convert base64 string to Blob
+function base64ToBlob(base64, mimeType) {
+  const bytes = atob(base64);
+  const buffer = new Uint8Array(bytes.length);
+  for (let i = 0; i < bytes.length; i++) {
+    buffer[i] = bytes.charCodeAt(i);
+  }
+  return new Blob([buffer], { type: mimeType });
 }
 
 function setupToolbar() {
@@ -90,11 +104,11 @@ async function handleSave() {
   const filename = document.getElementById('filenameInput').value.trim() || 'capture';
   const format = document.getElementById('formatSelect').value;
   const ext = TakePDFUtils.getFileExtension(format);
-  const mime = TakePDFUtils.getMimeType(format);
   const fullFilename = filename + ext;
   
-  // Download using chrome.downloads API
-  const downloadUrl = `data:${captureData.mimeType};base64,${captureData.base64}`;
+  // Download using Blob URL (data URLs hit size limits)
+  const blob = base64ToBlob(captureData.base64, captureData.mimeType);
+  const downloadUrl = URL.createObjectURL(blob);
   
   try {
     const dlId = await chrome.downloads.download({
@@ -103,6 +117,8 @@ async function handleSave() {
       saveAs: true
     });
     showNotification(`Saved as ${fullFilename}`, 'success');
+    // Revoke after download starts
+    setTimeout(() => URL.revokeObjectURL(downloadUrl), 5000);
   } catch (err) {
     showNotification(`Save failed: ${err.message}`, 'error');
   }
@@ -114,7 +130,7 @@ async function handleCopy() {
       showNotification('Cannot copy PDF to clipboard. Use Save instead.', 'warning');
       return;
     }
-    const blob = await fetch(`data:${captureData.mimeType};base64,${captureData.base64}`).then(r => r.blob());
+    const blob = base64ToBlob(captureData.base64, captureData.mimeType);
     // Clipboard API requires image/png
     let pngBlob = blob;
     if (captureData.mimeType !== 'image/png') {
