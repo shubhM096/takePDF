@@ -37,30 +37,75 @@ function renderPreview() {
   captureData._blobUrl = URL.createObjectURL(blob);
   
   if (captureData.format === 'pdf') {
-    // MV3 CSP blocks blob:/data: in embed/iframe/object for PDFs.
-    // Show PDF info card + "Open in PDF Viewer" button instead.
     sidebar.classList.add('visible');
     
-    // Estimate page count from base64 size (rough heuristic)
-    const sizeMB = (captureData.base64.length * 0.75 / (1024 * 1024)).toFixed(2);
+    // Set up PDF container
+    const pdfContainer = document.createElement('div');
+    pdfContainer.className = 'pdf-container';
+    previewArea.appendChild(pdfContainer);
     
-    const card = document.createElement('div');
-    card.className = 'pdf-preview-card';
-    card.innerHTML = `
-      <div class="pdf-icon">📄</div>
-      <h2 class="pdf-title">${captureData.title || 'Untitled'}</h2>
-      <p class="pdf-meta">${sizeMB} MB · PDF Document</p>
-      <p class="pdf-url">${captureData.url || ''}</p>
-      <button id="openPdfViewerBtn" class="btn-open-pdf">
-        ▶ Open in PDF Viewer
-      </button>
-      <p class="pdf-hint">Opens in Chrome's built-in PDF viewer in a new tab</p>
-    `;
-    previewArea.appendChild(card);
+    // Convert base64 to Uint8Array for PDF.js
+    const raw = atob(captureData.base64);
+    const uint8Array = new Uint8Array(raw.length);
+    for (let i = 0; i < raw.length; i++) {
+      uint8Array[i] = raw.charCodeAt(i);
+    }
     
-    // Attach handler for the open button
-    document.getElementById('openPdfViewerBtn').addEventListener('click', () => {
-      window.open(captureData._blobUrl, '_blank');
+    // Dynamically import PDF.js
+    import('./lib/pdf.min.mjs').then(async (pdfjsLib) => {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = './lib/pdf.worker.min.mjs';
+      
+      const loadingTask = pdfjsLib.getDocument({ data: uint8Array });
+      const pdfDoc = await loadingTask.promise;
+      
+      // Render all pages
+      for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
+        const page = await pdfDoc.getPage(pageNum);
+        
+        let viewport = page.getViewport({ scale: 1.5 });
+        const containerWidth = previewArea.clientWidth - 40; // minus padding
+        if (viewport.width > containerWidth) {
+          const scale = containerWidth / viewport.width * 1.5;
+          viewport = page.getViewport({ scale });
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.className = 'pdf-page-canvas';
+        const ctx = canvas.getContext('2d');
+        
+        const outputScale = window.devicePixelRatio || 1;
+        canvas.width = Math.floor(viewport.width * outputScale);
+        canvas.height = Math.floor(viewport.height * outputScale);
+        canvas.style.width = Math.floor(viewport.width) + "px";
+        canvas.style.height = Math.floor(viewport.height) + "px";
+
+        const transform = outputScale !== 1 
+          ? [outputScale, 0, 0, outputScale, 0, 0] 
+          : null;
+
+        pdfContainer.appendChild(canvas);
+        
+        const renderContext = {
+          canvasContext: ctx,
+          transform: transform,
+          viewport: viewport
+        };
+        
+        await page.render(renderContext).promise;
+      }
+    }).catch(err => {
+      console.error('PDF.js render error:', err);
+      // Fallback to simple card if rendering fails
+      pdfContainer.innerHTML = `
+        <div class="pdf-preview-card">
+          <div class="pdf-icon">📄</div>
+          <h2 class="pdf-title">${captureData.title || 'Untitled'}</h2>
+          <button id="openPdfViewerBtn" class="btn-open-pdf">▶ Open in PDF Viewer</button>
+        </div>
+      `;
+      document.getElementById('openPdfViewerBtn').addEventListener('click', () => {
+        window.open(captureData._blobUrl, '_blank');
+      });
     });
   } else {
     // Image preview — img tags are NOT subject to object-src CSP
