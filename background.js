@@ -235,6 +235,58 @@ async function handleCapture(options, providedTab) {
     });
     const dims = JSON.parse(dimResult.result.value);
     
+    // Feature 5: Inject temporary styles and handle sticky elements based on stickyHandling mode
+    // We run this for BOTH PDF and Image captures to prevent repeating patterns in Image capture
+    // and overlapping elements in PDF capture.
+    const stickyMode = mergedOptions.stickyHandling || 'auto';
+    await chrome.debugger.sendCommand({ tabId }, 'Runtime.evaluate', {
+      expression: `((mode) => {
+        const s = document.createElement('style');
+        s.id = 'takepdf-print-fix';
+        s.textContent = '@page { margin: 0 !important; size: auto !important; } p, div, li, h1, h2, h3, h4, h5, h6, pre, code, img, table, tr, td, article, section { page-break-inside: avoid !important; break-inside: avoid !important; }';
+        document.head.appendChild(s);
+        
+        if (mode === 'none') return;
+        
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        
+        document.querySelectorAll('header, nav, footer, aside, div, section, [role="banner"], [role="navigation"]').forEach(el => {
+          const cs = getComputedStyle(el);
+          if (cs.position !== 'fixed' && cs.position !== 'sticky') return;
+          
+          el.dataset.takepdfOrigPos = el.style.position;
+          el.dataset.takepdfOrigDisplay = el.style.display;
+          
+          if (mode === 'hide') {
+            // Hide all fixed/sticky elements
+            el.style.setProperty('display', 'none', 'important');
+          } else if (mode === 'flatten') {
+            // Convert to relative to keep it in document flow but unstick it
+            el.style.setProperty('position', 'relative', 'important');
+          } else {
+            // 'auto' mode: smart detection
+            const rect = el.getBoundingClientRect();
+            const isWide = rect.width > vw * 0.8; // Spans >80% viewport width
+            const isAtEdge = rect.top < 100 || rect.bottom > vh - 100; // Near top/bottom
+            const zIndex = parseInt(cs.zIndex) || 0;
+            const isOverlay = zIndex > 10;
+            
+            if (isWide && isAtEdge && isOverlay) {
+              // Likely a header/footer bar — hide it completely
+              el.style.setProperty('display', 'none', 'important');
+            } else {
+              // Not a header/footer — just flatten position
+              el.style.setProperty('position', 'relative', 'important');
+            }
+          }
+        });
+      })('${stickyMode}')`
+    });
+    
+    // Brief pause for layout to settle after styles are injected
+    await new Promise(r => setTimeout(r, 300));
+    
     if (mergedOptions.format === 'pdf') {
       // 10a. PDF Capture via CDP
       await chrome.debugger.sendCommand({ tabId }, 'Emulation.setEmulatedMedia', { media: 'screen' });
@@ -267,58 +319,9 @@ async function handleCapture(options, providedTab) {
         await new Promise(r => setTimeout(r, 500));
       }
       
-      // Feature 5: Inject temporary styles and handle sticky elements based on stickyHandling mode
-      const stickyMode = mergedOptions.stickyHandling || 'auto';
-      await chrome.debugger.sendCommand({ tabId }, 'Runtime.evaluate', {
-        expression: `((mode) => {
-          const s = document.createElement('style');
-          s.id = 'takepdf-print-fix';
-          s.textContent = '@page { margin: 0 !important; size: auto !important; } p, div, li, h1, h2, h3, h4, h5, h6, pre, code, img, table, tr, td, article, section { page-break-inside: avoid !important; break-inside: avoid !important; }';
-          document.head.appendChild(s);
-          
-          if (mode === 'none') return;
-          
-          const vw = window.innerWidth;
-          const vh = window.innerHeight;
-          
-          document.querySelectorAll('header, nav, footer, aside, div, section, [role="banner"], [role="navigation"]').forEach(el => {
-            const cs = getComputedStyle(el);
-            if (cs.position !== 'fixed' && cs.position !== 'sticky') return;
-            
-            el.dataset.takepdfOrigPos = el.style.position;
-            el.dataset.takepdfOrigDisplay = el.style.display;
-            
-            if (mode === 'hide') {
-              // Hide all fixed/sticky elements
-              el.style.setProperty('display', 'none', 'important');
-            } else if (mode === 'flatten') {
-              // Convert all to absolute (legacy behavior)
-              el.style.setProperty('position', 'absolute', 'important');
-            } else {
-              // 'auto' mode: smart detection
-              const rect = el.getBoundingClientRect();
-              const isWide = rect.width > vw * 0.8; // Spans >80% viewport width
-              const isAtEdge = rect.top < 100 || rect.bottom > vh - 100; // Near top/bottom
-              const zIndex = parseInt(cs.zIndex) || 0;
-              const isOverlay = zIndex > 10;
-              
-              if (isWide && isAtEdge && isOverlay) {
-                // Likely a header/footer bar — hide it completely
-                el.style.setProperty('display', 'none', 'important');
-              } else {
-                // Not a header/footer — just flatten position
-                el.style.setProperty('position', 'absolute', 'important');
-              }
-            }
-          });
-        })('${stickyMode}')`
-      });
-      
-      // Brief pause for layout to settle after viewport + style changes
-      await new Promise(r => setTimeout(r, 300));
-      
       const paperWidth = dims.viewportWidth / 96;
       const paperHeight = dims.scrollHeight / 96;
+
       
       // Feature 6 & 10: PDF options (footer, page size)
       const pdfParams = {
