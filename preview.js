@@ -119,6 +119,19 @@ async function handleSave() {
     showNotification(`Saved as ${fullFilename}`, 'success');
     // Revoke after download starts
     setTimeout(() => URL.revokeObjectURL(downloadUrl), 5000);
+    
+    // Log capture with the actual saved filename (not the auto-generated one)
+    await chrome.runtime.sendMessage({
+      action: 'logCapture',
+      entry: {
+        url: captureData.url,
+        title: captureData.title,
+        filename: fullFilename,
+        format: captureData.format,
+        timestamp: Date.now(),
+        downloadId: dlId
+      }
+    });
   } catch (err) {
     showNotification(`Save failed: ${err.message}`, 'error');
   }

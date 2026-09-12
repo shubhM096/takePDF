@@ -81,6 +81,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     });
     return true;
   }
+  if (message.action === 'logCapture') {
+    logCapture(message.entry).then(() => sendResponse({ success: true }));
+    return true;
+  }
   if (message.action === 'scrollProgress') {
     sendStatus({ status: 'scrolling', message: `Loading content... ${message.percent}%`, step: 2, totalSteps: 6, progress: message.percent });
   }
@@ -235,13 +239,33 @@ async function handleCapture(options, providedTab) {
       });
       const dims = JSON.parse(dimResult.result.value);
       
-      // Force the viewport to the full page height so Chrome renders everything in one shot
-      await chrome.debugger.sendCommand({ tabId }, 'Emulation.setDeviceMetricsOverride', {
-        width: dims.viewportWidth,
-        height: dims.scrollHeight,
-        deviceScaleFactor: 1,
-        mobile: false
-      });
+      const pageSize = mergedOptions.pdfPageSize || 'continuous';
+      
+      if (pageSize === 'continuous') {
+        // Force the viewport to the full page height so Chrome renders everything in one shot
+        await chrome.debugger.sendCommand({ tabId }, 'Emulation.setDeviceMetricsOverride', {
+          width: dims.viewportWidth,
+          height: dims.scrollHeight,
+          deviceScaleFactor: 1,
+          mobile: false
+        });
+      } else {
+        // For standard page sizes (A4/Letter/Legal): set viewport width to
+        // match the printable content width so content reflows to fit the page.
+        // Don't override height — let Chrome paginate naturally.
+        const sizes = { a4: [8.27, 11.69], letter: [8.5, 11.0], legal: [8.5, 14.0] };
+        const [pw, ph] = sizes[pageSize] || sizes.a4;
+        const marginInches = 0.4;
+        const contentWidthPx = Math.round((pw - marginInches * 2) * 96); // printable width in px
+        await chrome.debugger.sendCommand({ tabId }, 'Emulation.setDeviceMetricsOverride', {
+          width: contentWidthPx,
+          height: 0, // 0 = use default/auto
+          deviceScaleFactor: 1,
+          mobile: false
+        });
+        // Give the page time to reflow to the new width
+        await new Promise(r => setTimeout(r, 500));
+      }
       
       // Feature 5: Inject temporary styles and handle sticky elements based on stickyHandling mode
       const stickyMode = mergedOptions.stickyHandling || 'auto';
@@ -306,7 +330,6 @@ async function handleCapture(options, providedTab) {
       };
       
       // Feature 10: Page size
-      const pageSize = mergedOptions.pdfPageSize || 'continuous';
       if (pageSize === 'continuous') {
         pdfParams.paperWidth = paperWidth;
         pdfParams.paperHeight = paperHeight;
@@ -315,7 +338,7 @@ async function handleCapture(options, providedTab) {
         pdfParams.marginLeft = 0;
         pdfParams.marginRight = 0;
       } else {
-        // Standard page sizes (inches)
+        // Standard page sizes — dimensions already computed above
         const sizes = { a4: [8.27, 11.69], letter: [8.5, 11.0], legal: [8.5, 14.0] };
         const [w, h] = sizes[pageSize] || sizes.a4;
         pdfParams.paperWidth = w;
@@ -434,10 +457,8 @@ async function handleCapture(options, providedTab) {
             sourceTabId: tabId
           }
         });
-        // Open preview tab
+        // Open preview tab — don't log yet; preview.js will log with actual saved filename
         await chrome.tabs.create({ url: 'preview.html' });
-        // Log capture
-        await logCapture({ url: tab.url, title: tab.title, filename, format: mergedOptions.format, timestamp: Date.now() });
         sendStatus({ status: 'done', message: 'Capture ready for preview!', filename, step: 6, totalSteps: 6 });
         return { status: 'done', message: 'Capture ready for preview!', filename };
       }
