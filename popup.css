@@ -164,6 +164,16 @@ h1 {
   transform: scale(0.98);
 }
 
+.btn-row {
+  display: flex;
+  gap: 6px;
+}
+.btn-row .btn {
+  flex: 1;
+  font-size: 12px;
+  padding: 8px 4px;
+}
+
 .options-row {
   display: flex;
   flex-direction: column;
@@ -232,10 +242,41 @@ h1 {
   transform: translateX(14px);
 }
 
-.status-area {
+.progress-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.progress-bar {
+  flex: 1;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--accent), #00e5ff);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+.progress-step {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+  white-space: nowrap;
+}
+
+.status-row {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.status-area {
+  display: flex;
+  flex-direction: column;
   padding: 12px;
   border-radius: var(--radius-card);
   background: var(--glass-bg);

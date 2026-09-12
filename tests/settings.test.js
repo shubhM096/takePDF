@@ -10,8 +10,17 @@ beforeEach(() => {
   document.body.innerHTML = `
     <input type="radio" name="format" value="pdf" id="formatPdf" />
     <input type="radio" name="format" value="png" id="formatPng" />
+    <input type="radio" name="format" value="jpeg" id="formatJpeg" />
+    <input type="radio" name="format" value="webp" id="formatWebp" />
+    <div id="pngQualityGroup"></div>
+    <div id="jpegQualityGroup"></div>
+    <div id="webpQualityGroup"></div>
     <input type="range" id="pngQuality" value="100" />
     <span id="qualityValue">100</span>
+    <input type="range" id="jpegQuality" value="85" />
+    <span id="jpegQualityValue">85</span>
+    <input type="range" id="webpQuality" value="90" />
+    <span id="webpQualityValue">90</span>
     <input type="text" id="filenameTemplate" value="{title}_{date}" />
     <span id="filenamePreview"></span>
     <select id="defaultDelay"><option value="0">No delay</option></select>
@@ -23,6 +32,11 @@ beforeEach(() => {
     <input type="checkbox" id="hideScrollbars" />
     <input type="checkbox" id="pauseAnimations" />
     <input type="checkbox" id="hideCookieBanners" />
+    <input type="text" id="waitForSelector" value="" />
+    <input type="number" id="waitForSelectorTimeout" value="10000" />
+    <select id="stickyHandling"><option value="auto">auto</option></select>
+    <select id="pdfPageSize"><option value="continuous">continuous</option></select>
+    <input type="checkbox" id="pdfShowFooter" />
     <button id="saveBtn"></button>
     <button id="resetBtn"></button>
     <button id="openDownloadsBtn"></button>

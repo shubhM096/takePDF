@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "takePDF",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "permissions": [
     "activeTab",
     "scripting",
@@ -45,6 +45,12 @@
         "default": "Alt+Shift+S"
       },
       "description": "Capture full page as PNG"
+    },
+    "capture-jpeg": {
+      "suggested_key": {
+        "default": "Alt+Shift+J"
+      },
+      "description": "Capture full page as JPEG"
     }
   },
   "description": "Capture full web pages as PDF (with hyperlinks) or PNG"

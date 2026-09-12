@@ -20,6 +20,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 3. Button handlers
   document.getElementById('capturePdf').addEventListener('click', () => capture('pdf', 'full'));
   document.getElementById('capturePng').addEventListener('click', () => capture('png', 'full'));
+  document.getElementById('captureJpeg').addEventListener('click', () => capture('jpeg', 'full'));
+  document.getElementById('captureWebp').addEventListener('click', () => capture('webp', 'full'));
   document.getElementById('captureArea').addEventListener('click', () => capture('png', 'area'));
   
   // 4. Settings button
@@ -69,21 +71,28 @@ function capture(format, mode) {
 }
 
 function updateStatus(statusObj) {
-  showStatus(statusObj.status, statusObj.message);
-  
+  showStatus(statusObj.status, statusObj.message, statusObj.step, statusObj.totalSteps, statusObj.progress);
   if (statusObj.status === 'done') {
-    // Auto-close popup after 2 seconds on success
     setTimeout(() => window.close(), 2000);
   }
 }
 
-function showStatus(status, message) {
+function showStatus(status, message, step, totalSteps, progress) {
   const statusArea = document.getElementById('statusArea');
   const statusMessage = document.getElementById('statusMessage');
   const statusSpinner = document.getElementById('statusSpinner');
+  const progressFill = document.getElementById('progressFill');
+  const progressStep = document.getElementById('progressStep');
   
   statusArea.classList.remove('hidden');
   statusMessage.textContent = message;
+  
+  // Update progress bar
+  if (step && totalSteps) {
+    const percent = progress || Math.round((step / totalSteps) * 100);
+    progressFill.style.width = percent + '%';
+    progressStep.textContent = `Step ${step}/${totalSteps}`;
+  }
   
   // Update spinner/icon based on status
   if (status === 'done') {

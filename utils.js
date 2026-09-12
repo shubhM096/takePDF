@@ -29,9 +29,20 @@ const TakePDFUtils = {
       .substring(0, 200);
   },
   
+  getMimeType(format) {
+    if (format === 'png') return 'image/png';
+    if (format === 'jpeg') return 'image/jpeg';
+    if (format === 'webp') return 'image/webp';
+    return 'application/pdf';
+  },
   
+  getFileExtension(format) {
+    if (format === 'png') return '.png';
+    if (format === 'jpeg') return '.jpg';
+    if (format === 'webp') return '.webp';
+    return '.pdf';
+  },
 
-  
   formatFileSize(bytes) {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
@@ -62,6 +73,14 @@ const TakePDFUtils = {
   DEFAULT_SETTINGS: {
     defaultFormat: 'pdf',
     pngQuality: 100,
+    jpegQuality: 85,
+    webpQuality: 90,
+    waitForSelector: '',
+    waitForSelectorTimeout: 10000,
+    stickyHandling: 'auto',
+    pdfShowFooter: false,
+    pdfPageSize: 'continuous',
+    showPreview: false,
     filenameTemplate: '{title}_{date}',
     defaultDelay: 0,
     autoCopyToClipboard: false,

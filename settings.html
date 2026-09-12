@@ -28,12 +28,30 @@
             <input type="radio" name="format" value="png" id="formatPng">
             <span class="radio-custom"></span> PNG
           </label>
+          <label class="radio-label">
+            <input type="radio" name="format" id="formatJpeg" value="jpeg">
+            <span class="radio-custom"></span> JPEG
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="format" id="formatWebp" value="webp">
+            <span class="radio-custom"></span> WebP
+          </label>
         </div>
       </div>
       
-      <div class="setting-row">
+      <div class="setting-row" id="pngQualityGroup">
         <label for="pngQuality">PNG Quality (<span id="qualityValue">100</span>)</label>
         <input type="range" id="pngQuality" min="80" max="100" value="100" class="slider">
+      </div>
+      
+      <div class="setting-row" id="jpegQualityGroup" style="display: none;">
+        <label>JPEG Quality: <span id="jpegQualityValue">85</span>%</label>
+        <input type="range" id="jpegQuality" min="50" max="100" value="85" class="slider">
+      </div>
+
+      <div class="setting-row" id="webpQualityGroup" style="display: none;">
+        <label>WebP Quality: <span id="webpQualityValue">90</span>%</label>
+        <input type="range" id="webpQuality" min="50" max="100" value="90" class="slider">
       </div>
       
       <div class="setting-row">
@@ -90,6 +108,27 @@
     <div class="section">
       <h2>Page Processing</h2>
       
+      <!-- Selector-based wait -->
+      <div class="setting-row vertical">
+        <label for="waitForSelector">Wait for CSS Selector</label>
+        <p class="help-text">Wait until this element exists before capturing. Useful for SPAs.</p>
+        <input type="text" id="waitForSelector" placeholder="e.g. .content-loaded, #main-article" class="input-text">
+      </div>
+      <div class="setting-row">
+        <label for="waitForSelectorTimeout">Selector Timeout (ms)</label>
+        <input type="number" id="waitForSelectorTimeout" min="1000" max="30000" step="1000" value="10000" class="input-text">
+      </div>
+      
+      <div class="setting-row vertical">
+        <label for="stickyHandling">Handle Sticky Headers</label>
+        <select id="stickyHandling" class="select">
+          <option value="auto">Auto (Smart Detection)</option>
+          <option value="hide">Hide All Fixed/Sticky</option>
+          <option value="flatten">Flatten to Absolute</option>
+          <option value="none">Don't Touch</option>
+        </select>
+      </div>
+      
       <div class="setting-row">
         <label class="toggle-label">
           <input type="checkbox" id="expandScrollable">
@@ -124,6 +163,27 @@
           <input type="checkbox" id="hideCookieBanners">
           <span class="toggle-slider"></span>
           Attempt to hide cookie banners
+        </label>
+      </div>
+    </div>
+    
+    <!-- PDF Options section -->
+    <div class="section">
+      <h2>PDF Options</h2>
+      <div class="setting-row">
+        <label for="pdfPageSize">Page Size</label>
+        <select id="pdfPageSize" class="select">
+          <option value="continuous">Continuous (single page)</option>
+          <option value="a4">A4</option>
+          <option value="letter">US Letter</option>
+          <option value="legal">US Legal</option>
+        </select>
+      </div>
+      <div class="setting-row">
+        <label class="toggle-label">
+          <input type="checkbox" id="pdfShowFooter">
+          <span class="toggle-slider"></span>
+          Show source URL &amp; date in PDF footer
         </label>
       </div>
     </div>

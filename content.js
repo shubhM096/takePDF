@@ -1,5 +1,9 @@
 (function() {
   let expandedElements = [];
+  let lastContextMenuTarget = null;
+  document.addEventListener('contextmenu', (e) => {
+    lastContextMenuTarget = e.target;
+  }, true);
 
   async function preparePage(options) {
     // 1. Disable smooth scrolling
@@ -79,6 +83,9 @@
       if (newHeight > totalHeight) {
         totalHeight = newHeight; // H2: Track new content loaded by lazy loading
       }
+      
+      const percent = Math.min(100, Math.round((currentY / maxDepth) * 100));
+      chrome.runtime.sendMessage({ action: 'scrollProgress', percent }).catch(() => {});
     }
     window.scrollTo(0, totalHeight);
     await new Promise(r => setTimeout(r, 500));
@@ -373,6 +380,25 @@
         return true;
       }
       sendResponse(result);
+    }
+    
+    if (message.action === 'getElementRect') {
+      if (lastContextMenuTarget) {
+        const rect = lastContextMenuTarget.getBoundingClientRect();
+        sendResponse({
+          success: true,
+          selection: {
+            x: rect.x + window.scrollX,
+            y: rect.y + window.scrollY,
+            width: rect.width,
+            height: rect.height,
+            scale: 1
+          }
+        });
+      } else {
+        sendResponse({ success: false, message: 'No element selected' });
+      }
+      return true;
     }
   });
 

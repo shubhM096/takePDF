@@ -30,10 +30,20 @@
       <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
       Capture as PDF
     </button>
-    <button id="capturePng" class="btn btn-secondary">
-      <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
-      Capture as PNG
-    </button>
+    <div class="btn-row">
+      <button id="capturePng" class="btn btn-secondary">
+        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+        PNG
+      </button>
+      <button id="captureJpeg" class="btn btn-secondary">
+        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+        JPEG
+      </button>
+      <button id="captureWebp" class="btn btn-secondary">
+        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+        WebP
+      </button>
+    </div>
     <button id="captureArea" class="btn btn-outline">
       <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6.13 1L6 16a2 2 0 0 0 2 2h15"></path><path d="M1 6.13L16 6a2 2 0 0 1 2 2v15"></path></svg>
       Select Area
@@ -67,10 +77,18 @@
     </div>
   </div>
   
-  <!-- Status area -->
+  <!-- Status area with progress bar -->
   <div id="statusArea" class="status-area hidden">
-    <div class="status-spinner" id="statusSpinner"></div>
-    <span id="statusMessage">Preparing...</span>
+    <div class="progress-container">
+      <div class="progress-bar">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+      <span class="progress-step" id="progressStep"></span>
+    </div>
+    <div class="status-row">
+      <div class="status-spinner" id="statusSpinner"></div>
+      <span id="statusMessage">Preparing...</span>
+    </div>
   </div>
   
   <!-- Footer -->
@@ -81,7 +99,7 @@
     <button id="openLastSaveBtn" class="footer-btn" title="Open last saved file">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
     </button>
-    <span class="version">v1.0.0</span>
+    <span class="version">v1.1.0</span>
   </div>
   
   <script src="popup.js"></script>
