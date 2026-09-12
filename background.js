@@ -75,6 +75,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     chrome.downloads.showDefaultFolder();
     sendResponse({ status: 'ok' });
   }
+  if (message.action === 'getRecentCaptures') {
+    chrome.storage.local.get('captureLog', (result) => {
+      sendResponse({ captures: (result.captureLog || []).slice(0, 5) });
+    });
+    return true;
+  }
   if (message.action === 'scrollProgress') {
     sendStatus({ status: 'scrolling', message: `Loading content... ${message.percent}%`, step: 2, totalSteps: 6, progress: message.percent });
   }
@@ -400,10 +406,40 @@ async function handleCapture(options, providedTab) {
     // 13. Generate filename (with optional subfolder prefix)
     let filename = TakePDFUtils.generateFilename(mergedOptions.filenameTemplate || '{title}_{date}', tab.title, tab.url) + extension;
     if (mergedOptions.downloadSubfolder) {
-      // Sanitize subfolder: remove leading/trailing slashes, normalize separators
       const subfolder = mergedOptions.downloadSubfolder.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
       if (subfolder) {
         filename = subfolder + '/' + filename;
+      }
+    }
+    
+    // 13b. Feature 7: Route to preview tab if showPreview is enabled
+    sendStatus({ status: 'preparing', message: 'Preparing output...', step: 5, totalSteps: 6 });
+    if (mergedOptions.showPreview && !mergedOptions.copyToClipboard) {
+      // Store capture data in session storage for preview page
+      const base64SizeMB = downloadData.length / (1024 * 1024);
+      if (base64SizeMB > 9) {
+        // Too large for session storage (10MB limit per item)
+        // Fall through to direct download
+        console.warn(`takePDF: Capture too large for preview (${base64SizeMB.toFixed(1)}MB). Downloading directly.`);
+      } else {
+        await chrome.storage.session.set({
+          captureData: {
+            base64: downloadData,
+            format: mergedOptions.format,
+            filename: filename,
+            mimeType: mimeType,
+            url: tab.url,
+            title: tab.title,
+            timestamp: Date.now(),
+            sourceTabId: tabId
+          }
+        });
+        // Open preview tab
+        await chrome.tabs.create({ url: 'preview.html' });
+        // Log capture
+        await logCapture({ url: tab.url, title: tab.title, filename, format: mergedOptions.format, timestamp: Date.now() });
+        sendStatus({ status: 'done', message: 'Capture ready for preview!', filename, step: 6, totalSteps: 6 });
+        return { status: 'done', message: 'Capture ready for preview!', filename };
       }
     }
     
@@ -455,6 +491,9 @@ async function handleCapture(options, providedTab) {
       sendStatus({ status: 'done', message: 'Download complete!', filename, downloadId: dlId, step: 6, totalSteps: 6 });
     }
     
+    // Feature 9: Log capture
+    await logCapture({ url: tab.url, title: tab.title, filename, format: mergedOptions.format, timestamp: Date.now(), downloadId: lastDownloadId });
+    
     return { status: 'done', message: 'Capture complete!', filename };
     
   } catch (error) {
@@ -493,4 +532,23 @@ async function handleBatchCapture(options) {
   }
   
   sendStatus({ status: 'done', message: `Batch capture complete! ${validTabs.length} pages captured.` });
+}
+
+// Feature 9: Capture audit log
+async function logCapture(entry) {
+  try {
+    const { captureLog = [] } = await chrome.storage.local.get('captureLog');
+    captureLog.unshift({
+      url: entry.url,
+      title: entry.title,
+      filename: entry.filename,
+      format: entry.format,
+      timestamp: entry.timestamp || Date.now(),
+      downloadId: entry.downloadId || null
+    });
+    // Keep last 50 entries
+    await chrome.storage.local.set({ captureLog: captureLog.slice(0, 50) });
+  } catch (e) {
+    console.warn('takePDF: Failed to log capture:', e);
+  }
 }

@@ -17,7 +17,8 @@ const DEFAULT_SETTINGS = {
   waitForSelectorTimeout: 10000,
   stickyHandling: 'auto',
   pdfPageSize: 'continuous',
-  pdfShowFooter: false
+  pdfShowFooter: false,
+  showPreview: false
 };
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -115,6 +116,7 @@ function populateForm(settings) {
   document.getElementById('stickyHandling').value = settings.stickyHandling || 'auto';
   document.getElementById('pdfPageSize').value = settings.pdfPageSize || 'continuous';
   document.getElementById('pdfShowFooter').checked = settings.pdfShowFooter || false;
+  document.getElementById('showPreview').checked = settings.showPreview || false;
   
   updateFilenamePreview();
 }
@@ -139,7 +141,8 @@ function saveSettings() {
     waitForSelectorTimeout: parseInt(document.getElementById('waitForSelectorTimeout').value) || 10000,
     stickyHandling: document.getElementById('stickyHandling').value,
     pdfPageSize: document.getElementById('pdfPageSize').value,
-    pdfShowFooter: document.getElementById('pdfShowFooter').checked
+    pdfShowFooter: document.getElementById('pdfShowFooter').checked,
+    showPreview: document.getElementById('showPreview').checked
   };
   
   chrome.storage.local.set({ takePdfSettings: settings }, () => {

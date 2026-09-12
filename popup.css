@@ -355,3 +355,66 @@ h1 {
   color: var(--text-secondary);
   font-size: 11px;
 }
+
+/* Recent Captures */
+.recent-section {
+  padding: 8px 0 0 0;
+  border-top: 1px solid var(--glass-border);
+}
+
+.recent-title {
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.recent-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.recent-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 6px;
+  border-radius: 6px;
+  transition: background 0.15s ease;
+}
+
+.recent-item:hover {
+  background: var(--glass-bg);
+}
+
+.format-badge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 5px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  flex-shrink: 0;
+}
+
+.badge-pdf { background: rgba(255, 82, 82, 0.2); color: #ff5252; }
+.badge-png { background: rgba(0, 191, 255, 0.2); color: #00bfff; }
+.badge-jpeg { background: rgba(255, 183, 77, 0.2); color: #ffb74d; }
+.badge-webp { background: rgba(0, 230, 118, 0.2); color: #00e676; }
+
+.recent-item-title {
+  flex: 1;
+  font-size: 11px;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-item-time {
+  font-size: 10px;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}

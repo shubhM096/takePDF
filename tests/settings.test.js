@@ -40,6 +40,7 @@ beforeEach(() => {
     <select id="stickyHandling"><option value="auto">auto</option></select>
     <select id="pdfPageSize"><option value="continuous">continuous</option></select>
     <input type="checkbox" id="pdfShowFooter" />
+    <input type="checkbox" id="showPreview" />
     <button id="saveBtn"></button>
     <button id="resetBtn"></button>
     <button id="openDownloadsBtn"></button>

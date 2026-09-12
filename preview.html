@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>takePDF — Capture Preview</title>
+  <link rel="stylesheet" href="preview.css">
+</head>
+<body>
+  <div class="preview-app">
+    <!-- Top bar -->
+    <header class="top-bar">
+      <div class="top-bar-left">
+        <img src="icons/icon48.png" alt="" class="logo-icon">
+        <h1>Capture Preview</h1>
+      </div>
+      <div class="top-bar-right">
+        <span class="capture-info" id="captureInfo"></span>
+        <button class="btn-icon-only" id="closeBtn" title="Close">✕</button>
+      </div>
+    </header>
+    
+    <!-- Main content -->
+    <main class="preview-main">
+      <!-- Sidebar (for PDF pages - future) -->
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+          <h2>Pages</h2>
+          <div class="sidebar-actions">
+            <button id="selectAllBtn" class="sidebar-btn" title="Select All">☑ All</button>
+            <button id="deselectAllBtn" class="sidebar-btn" title="Deselect All">☐ None</button>
+          </div>
+        </div>
+        <div class="page-list" id="pageList">
+          <div class="page-placeholder">
+            <p>PDF page selection</p>
+            <p class="hint">Coming in next update</p>
+          </div>
+        </div>
+      </aside>
+      
+      <!-- Preview area -->
+      <div class="preview-area" id="previewArea">
+        <div class="preview-loading" id="previewLoading">
+          <div class="spinner"></div>
+          <p>Loading preview...</p>
+        </div>
+        <!-- PDF embed or Image will be inserted here -->
+      </div>
+    </main>
+    
+    <!-- Bottom toolbar -->
+    <footer class="bottom-bar">
+      <div class="toolbar-left">
+        <div class="field-group">
+          <label for="filenameInput">Filename</label>
+          <input type="text" id="filenameInput" class="filename-input" placeholder="filename">
+        </div>
+        <div class="field-group">
+          <label for="formatSelect">Format</label>
+          <select id="formatSelect" class="format-select">
+            <option value="pdf">PDF</option>
+            <option value="png">PNG</option>
+            <option value="jpeg">JPEG</option>
+            <option value="webp">WebP</option>
+          </select>
+        </div>
+      </div>
+      <div class="toolbar-right">
+        <button class="btn btn-primary" id="saveBtn">
+          <span class="btn-emoji">💾</span> Save
+        </button>
+        <button class="btn btn-secondary" id="copyBtn">
+          <span class="btn-emoji">📋</span> Copy
+        </button>
+        <button class="btn btn-outline" id="recaptureBtn">
+          <span class="btn-emoji">🔄</span> Re-capture
+        </button>
+        <button class="btn btn-danger" id="discardBtn">
+          <span class="btn-emoji">🗑</span> Discard
+        </button>
+      </div>
+    </footer>
+  </div>
+  
+  <script src="utils.js"></script>
+  <script src="preview.js"></script>
+</body>
+</html>
