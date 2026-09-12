@@ -140,7 +140,9 @@ function base64ToBlob(base64, mimeType) {
 function setupToolbar() {
   const filenameInput = document.getElementById('filenameInput');
   if (filenameInput) {
-    filenameInput.addEventListener('focus', () => filenameInput.select());
+    filenameInput.addEventListener('click', function() {
+      this.select();
+    });
   }
   
   // Save button

@@ -243,7 +243,7 @@ async function handleCapture(options, providedTab) {
       expression: `((mode) => {
         const s = document.createElement('style');
         s.id = 'takepdf-print-fix';
-        s.textContent = '@page { margin: 0 !important; size: auto !important; } p, div, li, h1, h2, h3, h4, h5, h6, pre, code, img, table, tr, td, article, section { page-break-inside: avoid !important; break-inside: avoid !important; }';
+        s.textContent = '@page { margin: 0 !important; size: auto !important; } p, li, h1, h2, h3, h4, h5, h6, pre, code, img, table, tr, td { page-break-inside: avoid !important; break-inside: avoid !important; }';
         document.head.appendChild(s);
         
         if (mode === 'none') return;
@@ -389,16 +389,8 @@ async function handleCapture(options, providedTab) {
       
     } else {
       // 10b. Image Capture: PNG, JPEG, or WebP
-      // Force viewport expansion to render off-screen elements (prevents repeating patterns)
-      await chrome.debugger.sendCommand({ tabId }, 'Emulation.setDeviceMetricsOverride', {
-        width: dims.viewportWidth,
-        height: dims.scrollHeight,
-        deviceScaleFactor: 1,
-        mobile: false
-      });
-      // Wait for layout and paint of the new massive viewport!
-      await new Promise(r => setTimeout(r, 800));
-      
+      // We rely on captureBeyondViewport to scroll and stitch. 
+      // Because we already flattened sticky elements to relative, they will NOT repeat on each stitched tile!
       const metrics = await chrome.debugger.sendCommand({ tabId }, 'Page.getLayoutMetrics');
       const contentWidth = metrics.cssContentSize ? metrics.cssContentSize.width : metrics.contentSize.width;
       let contentHeight = metrics.cssContentSize ? metrics.cssContentSize.height : metrics.contentSize.height;
@@ -414,7 +406,7 @@ async function handleCapture(options, providedTab) {
         format: format === 'jpeg' ? 'jpeg' : format === 'webp' ? 'webp' : 'png',
         quality: format === 'jpeg' ? (mergedOptions.jpegQuality || 85) : 
                  format === 'webp' ? (mergedOptions.webpQuality || 90) : undefined,
-        captureBeyondViewport: false, // Viewport is already expanded to full height!
+        captureBeyondViewport: true,
         fromSurface: true,
         clip: clipRegion || {
           x: 0,
