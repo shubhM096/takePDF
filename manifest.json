@@ -53,8 +53,5 @@
       "description": "Capture full page as JPEG"
     }
   },
-  "description": "Capture full web pages as PDF (with hyperlinks) or PNG",
-  "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self' blob:; frame-src 'self' blob:"
-  }
+  "description": "Capture full web pages as PDF (with hyperlinks) or PNG"
 }

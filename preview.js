@@ -32,25 +32,41 @@ function renderPreview() {
   // Set format dropdown
   document.getElementById('formatSelect').value = captureData.format;
   
+  // Store blob URL on captureData for reuse
+  const blob = base64ToBlob(captureData.base64, captureData.format === 'pdf' ? 'application/pdf' : captureData.mimeType);
+  captureData._blobUrl = URL.createObjectURL(blob);
+  
   if (captureData.format === 'pdf') {
-    // Show sidebar for PDF
+    // MV3 CSP blocks blob:/data: in embed/iframe/object for PDFs.
+    // Show PDF info card + "Open in PDF Viewer" button instead.
     sidebar.classList.add('visible');
-    // Convert base64 to Blob URL (data: URLs blocked by extension CSP)
-    const pdfBlob = base64ToBlob(captureData.base64, 'application/pdf');
-    const blobUrl = URL.createObjectURL(pdfBlob);
-    // Use iframe instead of embed — Chrome's PDF viewer works more reliably in iframes
-    const iframe = document.createElement('iframe');
-    iframe.src = blobUrl;
-    iframe.className = 'preview-embed';
-    iframe.setAttribute('allow', 'fullscreen');
-    previewArea.appendChild(iframe);
+    
+    // Estimate page count from base64 size (rough heuristic)
+    const sizeMB = (captureData.base64.length * 0.75 / (1024 * 1024)).toFixed(2);
+    
+    const card = document.createElement('div');
+    card.className = 'pdf-preview-card';
+    card.innerHTML = `
+      <div class="pdf-icon">📄</div>
+      <h2 class="pdf-title">${captureData.title || 'Untitled'}</h2>
+      <p class="pdf-meta">${sizeMB} MB · PDF Document</p>
+      <p class="pdf-url">${captureData.url || ''}</p>
+      <button id="openPdfViewerBtn" class="btn-open-pdf">
+        ▶ Open in PDF Viewer
+      </button>
+      <p class="pdf-hint">Opens in Chrome's built-in PDF viewer in a new tab</p>
+    `;
+    previewArea.appendChild(card);
+    
+    // Attach handler for the open button
+    document.getElementById('openPdfViewerBtn').addEventListener('click', () => {
+      window.open(captureData._blobUrl, '_blank');
+    });
   } else {
-    // Image preview
+    // Image preview — img tags are NOT subject to object-src CSP
     sidebar.classList.remove('visible');
-    const imgBlob = base64ToBlob(captureData.base64, captureData.mimeType);
-    const blobUrl = URL.createObjectURL(imgBlob);
     const img = document.createElement('img');
-    img.src = blobUrl;
+    img.src = captureData._blobUrl;
     img.className = 'preview-image';
     img.alt = 'Captured screenshot';
     previewArea.appendChild(img);
