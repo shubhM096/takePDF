@@ -12,15 +12,18 @@ beforeEach(() => {
     <input type="radio" name="format" value="png" id="formatPng" />
     <input type="radio" name="format" value="jpeg" id="formatJpeg" />
     <input type="radio" name="format" value="webp" id="formatWebp" />
-    <div id="pngQualityGroup"></div>
-    <div id="jpegQualityGroup"></div>
-    <div id="webpQualityGroup"></div>
-    <input type="range" id="pngQuality" value="100" />
-    <span id="qualityValue">100</span>
-    <input type="range" id="jpegQuality" value="85" />
-    <span id="jpegQualityValue">85</span>
-    <input type="range" id="webpQuality" value="90" />
-    <span id="webpQualityValue">90</span>
+    <div id="pngQualityGroup">
+      <input type="range" id="pngQuality" value="100" />
+      <span id="qualityValue">100</span>
+    </div>
+    <div id="jpegQualityGroup">
+      <input type="range" id="jpegQuality" value="85" />
+      <span id="jpegQualityValue">85</span>
+    </div>
+    <div id="webpQualityGroup">
+      <input type="range" id="webpQuality" value="90" />
+      <span id="webpQualityValue">90</span>
+    </div>
     <input type="text" id="filenameTemplate" value="{title}_{date}" />
     <span id="filenamePreview"></span>
     <select id="defaultDelay"><option value="0">No delay</option></select>

@@ -91,6 +91,38 @@
     await new Promise(r => setTimeout(r, 500));
   }
 
+  // Feature 4: Wait for a CSS selector to exist on the page
+  async function waitForSelector(selector, timeout = 10000) {
+    if (!selector || !selector.trim()) return { success: true, found: true };
+    
+    // Check immediately
+    if (document.querySelector(selector)) {
+      return { success: true, found: true };
+    }
+    
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        observer.disconnect();
+        resolve({ success: true, found: false, message: `Selector "${selector}" not found within ${timeout}ms` });
+      }, timeout);
+      
+      const observer = new MutationObserver(() => {
+        if (document.querySelector(selector)) {
+          observer.disconnect();
+          clearTimeout(timer);
+          resolve({ success: true, found: true });
+        }
+      });
+      
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['class', 'id']
+      });
+    });
+  }
+
   async function waitForImages(timeout = 10000) {
     const images = Array.from(document.querySelectorAll('img'));
     const pendingImages = images.filter(img => !img.complete && img.src);
@@ -369,7 +401,8 @@
       'expandScrollable': () => expandScrollableContainers(),
       'startAreaSelection': () => startAreaSelection(),
       'showCountdown': () => showCountdown(message.seconds),
-      'restorePage': () => restorePage()
+      'restorePage': () => restorePage(),
+      'waitForSelector': () => waitForSelector(message.selector, message.timeout)
     };
     
     const handler = handlers[message.action];

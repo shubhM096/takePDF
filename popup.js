@@ -1,36 +1,42 @@
 document.addEventListener('DOMContentLoaded', async () => {
   // 1. Load current tab info
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  document.getElementById('tabTitle').textContent = tab.title || 'Untitled';
+  const tabTitleEl = document.getElementById('tabTitle');
+  const tabUrlEl = document.getElementById('tabUrl');
+  const tabFaviconEl = document.getElementById('tabFavicon');
+  if (tabTitleEl) tabTitleEl.textContent = tab.title || 'Untitled';
   
   try {
     const url = new URL(tab.url);
-    document.getElementById('tabUrl').textContent = url.hostname;
-    document.getElementById('tabFavicon').src = `https://www.google.com/s2/favicons?domain=${url.hostname}&sz=32`;
+    if (tabUrlEl) tabUrlEl.textContent = url.hostname;
+    if (tabFaviconEl) tabFaviconEl.src = `https://www.google.com/s2/favicons?domain=${url.hostname}&sz=32`;
   } catch(e) {
-    document.getElementById('tabUrl').textContent = tab.url || '';
+    if (tabUrlEl) tabUrlEl.textContent = tab.url || '';
   }
   
   // 2. Load settings and apply to UI
   const settings = await loadSettings();
-  document.getElementById('delaySelect').value = settings.defaultDelay || 0;
-  document.getElementById('expandToggle').checked = settings.expandScrollable !== false;
-  document.getElementById('clipboardToggle').checked = settings.autoCopyToClipboard || false;
+  const delayEl = document.getElementById('delaySelect');
+  const expandEl = document.getElementById('expandToggle');
+  const clipEl = document.getElementById('clipboardToggle');
+  if (delayEl) delayEl.value = settings.defaultDelay || 0;
+  if (expandEl) expandEl.checked = settings.expandScrollable !== false;
+  if (clipEl) clipEl.checked = settings.autoCopyToClipboard || false;
   
   // 3. Button handlers
-  document.getElementById('capturePdf').addEventListener('click', () => capture('pdf', 'full'));
-  document.getElementById('capturePng').addEventListener('click', () => capture('png', 'full'));
-  document.getElementById('captureJpeg').addEventListener('click', () => capture('jpeg', 'full'));
-  document.getElementById('captureWebp').addEventListener('click', () => capture('webp', 'full'));
-  document.getElementById('captureArea').addEventListener('click', () => capture('png', 'area'));
+  document.getElementById('capturePdf')?.addEventListener('click', () => capture('pdf', 'full'));
+  document.getElementById('capturePng')?.addEventListener('click', () => capture('png', 'full'));
+  document.getElementById('captureJpeg')?.addEventListener('click', () => capture('jpeg', 'full'));
+  document.getElementById('captureWebp')?.addEventListener('click', () => capture('webp', 'full'));
+  document.getElementById('captureArea')?.addEventListener('click', () => capture('png', 'area'));
   
   // 4. Settings button
-  document.getElementById('settingsBtn').addEventListener('click', () => {
+  document.getElementById('settingsBtn')?.addEventListener('click', () => {
     chrome.runtime.openOptionsPage ? chrome.runtime.openOptionsPage() : window.open('settings.html');
   });
   
   // 4b. Open last save location
-  document.getElementById('openLastSaveBtn').addEventListener('click', () => {
+  document.getElementById('openLastSaveBtn')?.addEventListener('click', () => {
     chrome.runtime.sendMessage({ action: 'openLastSave' });
   });
   

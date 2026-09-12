@@ -176,7 +176,21 @@ async function handleCapture(options, providedTab) {
       hideCookieBanners: mergedOptions.hideCookieBanners
     });
     
+    // 6b. Wait for CSS selector if configured (Feature 4)
+    if (mergedOptions.waitForSelector) {
+      sendStatus({ status: 'preparing', message: `Waiting for "${mergedOptions.waitForSelector}"...`, step: 2, totalSteps: 6 });
+      const waitResult = await sendToContent(tabId, {
+        action: 'waitForSelector',
+        selector: mergedOptions.waitForSelector,
+        timeout: mergedOptions.waitForSelectorTimeout || 10000
+      });
+      if (waitResult && !waitResult.found) {
+        console.warn(`takePDF: ${waitResult.message}. Continuing anyway.`);
+      }
+    }
+    
     // 7. Expand scrollable containers if enabled
+    sendStatus({ status: 'preparing', message: 'Expanding containers...', step: 3, totalSteps: 6 });
     if (mergedOptions.expandScrollable) {
       await sendToContent(tabId, { action: 'expandScrollable' });
     }
@@ -223,26 +237,51 @@ async function handleCapture(options, providedTab) {
         mobile: false
       });
       
-      // Inject temporary styles via CDP: reset @page rules + hide fixed/sticky elements
-      // This is invisible to the user (injected and removed within the debugger session)
+      // Feature 5: Inject temporary styles and handle sticky elements based on stickyHandling mode
+      const stickyMode = mergedOptions.stickyHandling || 'auto';
       await chrome.debugger.sendCommand({ tabId }, 'Runtime.evaluate', {
-        expression: `(() => {
+        expression: `((mode) => {
           const s = document.createElement('style');
           s.id = 'takepdf-print-fix';
-          s.textContent = [
-            '@page { margin: 0 !important; size: auto !important; }',
-            '[style*="position: fixed"], [style*="position:fixed"] { position: absolute !important; }',
-          ].join('\\n');
+          s.textContent = '@page { margin: 0 !important; size: auto !important; }';
           document.head.appendChild(s);
-          // Also neutralize computed fixed/sticky elements
-          document.querySelectorAll('header, nav, [role="banner"], [role="navigation"], div, aside, footer').forEach(el => {
+          
+          if (mode === 'none') return;
+          
+          const vw = window.innerWidth;
+          const vh = window.innerHeight;
+          
+          document.querySelectorAll('header, nav, footer, aside, div, section, [role="banner"], [role="navigation"]').forEach(el => {
             const cs = getComputedStyle(el);
-            if (cs.position === 'fixed' || cs.position === 'sticky') {
-              el.dataset.takepdfOrigPos = el.style.position;
+            if (cs.position !== 'fixed' && cs.position !== 'sticky') return;
+            
+            el.dataset.takepdfOrigPos = el.style.position;
+            el.dataset.takepdfOrigDisplay = el.style.display;
+            
+            if (mode === 'hide') {
+              // Hide all fixed/sticky elements
+              el.style.setProperty('display', 'none', 'important');
+            } else if (mode === 'flatten') {
+              // Convert all to absolute (legacy behavior)
               el.style.setProperty('position', 'absolute', 'important');
+            } else {
+              // 'auto' mode: smart detection
+              const rect = el.getBoundingClientRect();
+              const isWide = rect.width > vw * 0.8; // Spans >80% viewport width
+              const isAtEdge = rect.top < 100 || rect.bottom > vh - 100; // Near top/bottom
+              const zIndex = parseInt(cs.zIndex) || 0;
+              const isOverlay = zIndex > 10;
+              
+              if (isWide && isAtEdge && isOverlay) {
+                // Likely a header/footer bar — hide it completely
+                el.style.setProperty('display', 'none', 'important');
+              } else {
+                // Not a header/footer — just flatten position
+                el.style.setProperty('position', 'absolute', 'important');
+              }
             }
           });
-        })()`
+        })('${stickyMode}')`
       });
       
       // Brief pause for layout to settle after viewport + style changes
@@ -251,20 +290,50 @@ async function handleCapture(options, providedTab) {
       const paperWidth = dims.viewportWidth / 96;
       const paperHeight = dims.scrollHeight / 96;
       
-      const pdfResult = await chrome.debugger.sendCommand({ tabId }, 'Page.printToPDF', {
-        paperWidth,
-        paperHeight,
-        marginTop: 0,
-        marginBottom: 0,
-        marginLeft: 0,
-        marginRight: 0,
+      // Feature 6 & 10: PDF options (footer, page size)
+      const pdfParams = {
         printBackground: true,
         preferCSSPageSize: false,
         generateTaggedPDF: true,
-        displayHeaderFooter: false,
         scale: 1,
         transferMode: 'ReturnAsBase64'
-      });
+      };
+      
+      // Feature 10: Page size
+      const pageSize = mergedOptions.pdfPageSize || 'continuous';
+      if (pageSize === 'continuous') {
+        pdfParams.paperWidth = paperWidth;
+        pdfParams.paperHeight = paperHeight;
+        pdfParams.marginTop = 0;
+        pdfParams.marginBottom = 0;
+        pdfParams.marginLeft = 0;
+        pdfParams.marginRight = 0;
+      } else {
+        // Standard page sizes (inches)
+        const sizes = { a4: [8.27, 11.69], letter: [8.5, 11.0], legal: [8.5, 14.0] };
+        const [w, h] = sizes[pageSize] || sizes.a4;
+        pdfParams.paperWidth = w;
+        pdfParams.paperHeight = h;
+        pdfParams.marginTop = 0.4;
+        pdfParams.marginBottom = 0.4;
+        pdfParams.marginLeft = 0.4;
+        pdfParams.marginRight = 0.4;
+      }
+      
+      // Feature 6: PDF footer with source URL & date
+      if (mergedOptions.pdfShowFooter) {
+        pdfParams.displayHeaderFooter = true;
+        pdfParams.headerTemplate = '<span></span>';
+        pdfParams.footerTemplate = '<div style="font-size:8px;color:#999;width:100%;text-align:center;padding:4px 16px;"><span class="url"></span> — Captured <span class="date"></span></div>';
+        // Ensure enough margin for footer when in continuous mode
+        if (pageSize === 'continuous') {
+          pdfParams.marginBottom = 0.4;
+        }
+      } else {
+        pdfParams.displayHeaderFooter = false;
+      }
+      
+      const pdfResult = await chrome.debugger.sendCommand({ tabId }, 'Page.printToPDF', pdfParams);
       
       // Clean up: restore fixed elements and remove injected style
       await chrome.debugger.sendCommand({ tabId }, 'Runtime.evaluate', {
@@ -272,7 +341,9 @@ async function handleCapture(options, providedTab) {
           document.getElementById('takepdf-print-fix')?.remove();
           document.querySelectorAll('[data-takepdf-orig-pos]').forEach(el => {
             el.style.position = el.dataset.takepdfOrigPos || '';
+            el.style.display = el.dataset.takepdfOrigDisplay || '';
             delete el.dataset.takepdfOrigPos;
+            delete el.dataset.takepdfOrigDisplay;
           });
         })()`
       });

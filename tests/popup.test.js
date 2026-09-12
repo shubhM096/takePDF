@@ -11,6 +11,8 @@ beforeEach(() => {
     <img id="tabFavicon" />
     <button id="capturePdf"></button>
     <button id="capturePng"></button>
+    <button id="captureJpeg"></button>
+    <button id="captureWebp"></button>
     <button id="captureArea"></button>
     <select id="delaySelect">
       <option value="0">No delay</option>
@@ -22,6 +24,8 @@ beforeEach(() => {
     <div id="statusArea" class="hidden"></div>
     <div id="statusSpinner"></div>
     <span id="statusMessage"></span>
+    <div id="progressFill"></div>
+    <span id="progressStep"></span>
     <button id="settingsBtn"></button>
     <button id="openLastSaveBtn"></button>
   `;
