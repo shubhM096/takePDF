@@ -13,6 +13,12 @@
         <img src="icons/icon48.png" alt="" class="logo-icon">
         <h1>Capture Preview</h1>
       </div>
+      <div class="top-bar-center" id="zoomControls">
+        <button class="btn-icon-only" id="zoomOutBtn" title="Zoom Out">🔍-</button>
+        <span id="zoomLevel">100%</span>
+        <button class="btn-icon-only" id="zoomInBtn" title="Zoom In">🔍+</button>
+        <button class="btn-icon-only" id="zoomResetBtn" title="Reset Zoom">↺</button>
+      </div>
       <div class="top-bar-right">
         <span class="capture-info" id="captureInfo"></span>
         <button class="btn-icon-only" id="closeBtn" title="Close">✕</button>
@@ -31,20 +37,19 @@
           </div>
         </div>
         <div class="page-list" id="pageList">
-          <div class="page-placeholder">
-            <p>PDF page selection</p>
-            <p class="hint">Coming in next update</p>
-          </div>
+          <!-- Page checkboxes injected dynamically -->
         </div>
       </aside>
       
       <!-- Preview area -->
       <div class="preview-area" id="previewArea">
-        <div class="preview-loading" id="previewLoading">
-          <div class="spinner"></div>
-          <p>Loading preview...</p>
+        <div class="preview-zoom-container" id="zoomContainer">
+          <div class="preview-loading" id="previewLoading">
+            <div class="spinner"></div>
+            <p>Loading preview...</p>
+          </div>
+          <!-- PDF embed or Image will be inserted here -->
         </div>
-        <!-- PDF embed or Image will be inserted here -->
       </div>
     </main>
     
@@ -82,6 +87,7 @@
     </footer>
   </div>
   
+  <script src="lib/pdf-lib.min.js"></script>
   <script src="utils.js"></script>
   <script src="preview.js"></script>
 </body>

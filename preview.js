@@ -1,4 +1,7 @@
 let captureData = null;
+let currentZoom = 1.0;
+let totalPdfPages = 0;
+let selectedPages = new Set();
 
 document.addEventListener('DOMContentLoaded', async () => {
   await loadCaptureData();
@@ -18,6 +21,7 @@ async function loadCaptureData() {
 
 function renderPreview() {
   const previewArea = document.getElementById('previewArea');
+  const zoomContainer = document.getElementById('zoomContainer');
   const loading = document.getElementById('previewLoading');
   const sidebar = document.getElementById('sidebar');
   
@@ -42,7 +46,7 @@ function renderPreview() {
     // Set up PDF container
     const pdfContainer = document.createElement('div');
     pdfContainer.className = 'pdf-container';
-    previewArea.appendChild(pdfContainer);
+    zoomContainer.appendChild(pdfContainer);
     
     // Convert base64 to Uint8Array for PDF.js
     const raw = atob(captureData.base64);
@@ -57,6 +61,9 @@ function renderPreview() {
       
       const loadingTask = pdfjsLib.getDocument({ data: uint8Array });
       const pdfDoc = await loadingTask.promise;
+      
+      totalPdfPages = pdfDoc.numPages;
+      buildPageSidebar();
       
       // Render all pages
       for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
@@ -114,7 +121,7 @@ function renderPreview() {
     img.src = captureData._blobUrl;
     img.className = 'preview-image';
     img.alt = 'Captured screenshot';
-    previewArea.appendChild(img);
+    zoomContainer.appendChild(img);
   }
   
   loading.style.display = 'none';
@@ -143,6 +150,68 @@ function setupToolbar() {
   // Discard (close tab, clear data)
   document.getElementById('discardBtn').addEventListener('click', handleDiscard);
   
+  // Zoom Controls
+  document.getElementById('zoomInBtn').addEventListener('click', () => setZoom(currentZoom + 0.25));
+  document.getElementById('zoomOutBtn').addEventListener('click', () => setZoom(currentZoom - 0.25));
+  document.getElementById('zoomResetBtn').addEventListener('click', () => setZoom(1.0));
+  
+  // Sidebar Controls
+  document.getElementById('selectAllBtn').addEventListener('click', () => {
+    document.querySelectorAll('.page-checkbox').forEach(cb => {
+      if (!cb.checked) cb.parentElement.click();
+    });
+  });
+  document.getElementById('deselectAllBtn').addEventListener('click', () => {
+    document.querySelectorAll('.page-checkbox').forEach(cb => {
+      if (cb.checked) cb.parentElement.click();
+    });
+  });
+}
+
+function setZoom(level) {
+  currentZoom = Math.max(0.25, Math.min(level, 3.0));
+  document.getElementById('zoomLevel').textContent = `${Math.round(currentZoom * 100)}%`;
+  document.getElementById('zoomContainer').style.transform = `scale(${currentZoom})`;
+}
+
+function buildPageSidebar() {
+  const list = document.getElementById('pageList');
+  list.innerHTML = '';
+  selectedPages.clear();
+  
+  for (let i = 1; i <= totalPdfPages; i++) {
+    selectedPages.add(i);
+    
+    const item = document.createElement('div');
+    item.className = 'page-item';
+    
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.className = 'page-checkbox';
+    cb.checked = true;
+    cb.dataset.page = i;
+    
+    const label = document.createElement('span');
+    label.className = 'page-label';
+    label.textContent = `Page ${i}`;
+    
+    item.appendChild(cb);
+    item.appendChild(label);
+    
+    item.addEventListener('click', (e) => {
+      if (e.target !== cb) cb.checked = !cb.checked;
+      if (cb.checked) {
+        selectedPages.add(i);
+        item.classList.remove('unselected');
+      } else {
+        selectedPages.delete(i);
+        item.classList.add('unselected');
+      }
+    });
+    
+    list.appendChild(item);
+  }
+  
   // Close button
   document.getElementById('closeBtn').addEventListener('click', handleDiscard);
   
@@ -168,9 +237,40 @@ async function handleSave() {
   const ext = TakePDFUtils.getFileExtension(format);
   const fullFilename = filename + ext;
   
-  // Download using Blob URL (data URLs hit size limits)
-  const blob = base64ToBlob(captureData.base64, captureData.mimeType);
-  const downloadUrl = URL.createObjectURL(blob);
+  let finalBlob;
+  
+  if (format === 'pdf' && selectedPages.size < totalPdfPages) {
+    if (selectedPages.size === 0) {
+      showNotification('Please select at least one page', 'error');
+      return;
+    }
+    try {
+      showNotification('Processing PDF...', 'info');
+      // Subsetting PDF with pdf-lib
+      const raw = atob(captureData.base64);
+      const uint8Array = new Uint8Array(raw.length);
+      for (let i = 0; i < raw.length; i++) uint8Array[i] = raw.charCodeAt(i);
+      
+      const pdfDoc = await PDFLib.PDFDocument.load(uint8Array);
+      const newPdf = await PDFLib.PDFDocument.create();
+      
+      const pagesToCopy = Array.from(selectedPages).sort((a,b)=>a-b).map(p => p - 1);
+      const copiedPages = await newPdf.copyPages(pdfDoc, pagesToCopy);
+      copiedPages.forEach(p => newPdf.addPage(p));
+      
+      const pdfBytes = await newPdf.save();
+      finalBlob = new Blob([pdfBytes], { type: 'application/pdf' });
+    } catch (e) {
+      console.error('PDF modification failed', e);
+      showNotification('Failed to modify PDF', 'error');
+      return;
+    }
+  } else {
+    // Download using original Blob
+    finalBlob = base64ToBlob(captureData.base64, captureData.mimeType);
+  }
+  
+  const downloadUrl = URL.createObjectURL(finalBlob);
   
   try {
     const dlId = await chrome.downloads.download({

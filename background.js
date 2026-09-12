@@ -225,19 +225,19 @@ async function handleCapture(options, providedTab) {
     let mimeType;
     let extension;
     
+    // Get exact viewport dimensions via CDP Runtime (most reliable source)
+    const dimResult = await chrome.debugger.sendCommand({ tabId }, 'Runtime.evaluate', {
+      expression: `JSON.stringify({
+        viewportWidth: document.documentElement.clientWidth,
+        scrollHeight: Math.max(document.documentElement.scrollHeight, document.body.scrollHeight)
+      })`,
+      returnByValue: true
+    });
+    const dims = JSON.parse(dimResult.result.value);
+    
     if (mergedOptions.format === 'pdf') {
       // 10a. PDF Capture via CDP
       await chrome.debugger.sendCommand({ tabId }, 'Emulation.setEmulatedMedia', { media: 'screen' });
-      
-      // Get exact viewport dimensions via CDP Runtime (most reliable source)
-      const dimResult = await chrome.debugger.sendCommand({ tabId }, 'Runtime.evaluate', {
-        expression: `JSON.stringify({
-          viewportWidth: document.documentElement.clientWidth,
-          scrollHeight: Math.max(document.documentElement.scrollHeight, document.body.scrollHeight)
-        })`,
-        returnByValue: true
-      });
-      const dims = JSON.parse(dimResult.result.value);
       
       const pageSize = mergedOptions.pdfPageSize || 'continuous';
       
@@ -386,6 +386,14 @@ async function handleCapture(options, providedTab) {
       
     } else {
       // 10b. Image Capture: PNG, JPEG, or WebP
+      // Force viewport expansion to render off-screen elements (prevents repeating patterns)
+      await chrome.debugger.sendCommand({ tabId }, 'Emulation.setDeviceMetricsOverride', {
+        width: dims.viewportWidth,
+        height: dims.scrollHeight,
+        deviceScaleFactor: 1,
+        mobile: false
+      });
+      
       const metrics = await chrome.debugger.sendCommand({ tabId }, 'Page.getLayoutMetrics');
       const contentWidth = metrics.cssContentSize ? metrics.cssContentSize.width : metrics.contentSize.width;
       let contentHeight = metrics.cssContentSize ? metrics.cssContentSize.height : metrics.contentSize.height;
