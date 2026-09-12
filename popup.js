@@ -1,0 +1,104 @@
+document.addEventListener('DOMContentLoaded', async () => {
+  // 1. Load current tab info
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  document.getElementById('tabTitle').textContent = tab.title || 'Untitled';
+  
+  try {
+    const url = new URL(tab.url);
+    document.getElementById('tabUrl').textContent = url.hostname;
+    document.getElementById('tabFavicon').src = `https://www.google.com/s2/favicons?domain=${url.hostname}&sz=32`;
+  } catch(e) {
+    document.getElementById('tabUrl').textContent = tab.url || '';
+  }
+  
+  // 2. Load settings and apply to UI
+  const settings = await loadSettings();
+  document.getElementById('delaySelect').value = settings.defaultDelay || 0;
+  document.getElementById('expandToggle').checked = settings.expandScrollable !== false;
+  document.getElementById('clipboardToggle').checked = settings.autoCopyToClipboard || false;
+  
+  // 3. Button handlers
+  document.getElementById('capturePdf').addEventListener('click', () => capture('pdf', 'full'));
+  document.getElementById('capturePng').addEventListener('click', () => capture('png', 'full'));
+  document.getElementById('captureArea').addEventListener('click', () => capture('png', 'area'));
+  
+  // 4. Settings button
+  document.getElementById('settingsBtn').addEventListener('click', () => {
+    chrome.runtime.openOptionsPage ? chrome.runtime.openOptionsPage() : window.open('settings.html');
+  });
+  
+  // 4b. Open last save location
+  document.getElementById('openLastSaveBtn').addEventListener('click', () => {
+    chrome.runtime.sendMessage({ action: 'openLastSave' });
+  });
+  
+  // 5. Listen for status updates from background
+  chrome.runtime.onMessage.addListener((message) => {
+    if (message.status) updateStatus(message);
+  });
+});
+
+async function loadSettings() {
+  return new Promise(resolve => {
+    chrome.storage.local.get('takePdfSettings', (result) => {
+      resolve(result.takePdfSettings || {});
+    });
+  });
+}
+
+function capture(format, mode) {
+  const delay = parseInt(document.getElementById('delaySelect').value) || 0;
+  const expandScrollable = document.getElementById('expandToggle').checked;
+  const copyToClipboard = document.getElementById('clipboardToggle').checked;
+  
+  showStatus('preparing', 'Preparing capture...');
+  
+  chrome.runtime.sendMessage({
+    action: 'capture',
+    format,
+    mode,
+    delay,
+    expandScrollable,
+    copyToClipboard
+  });
+  
+  // Close popup after a delay if in area selection mode
+  if (mode === 'area') {
+    setTimeout(() => window.close(), 300);
+  }
+}
+
+function updateStatus(statusObj) {
+  showStatus(statusObj.status, statusObj.message);
+  
+  if (statusObj.status === 'done') {
+    // Auto-close popup after 2 seconds on success
+    setTimeout(() => window.close(), 2000);
+  }
+}
+
+function showStatus(status, message) {
+  const statusArea = document.getElementById('statusArea');
+  const statusMessage = document.getElementById('statusMessage');
+  const statusSpinner = document.getElementById('statusSpinner');
+  
+  statusArea.classList.remove('hidden');
+  statusMessage.textContent = message;
+  
+  // Update spinner/icon based on status
+  if (status === 'done') {
+    statusSpinner.classList.add('done');
+    statusSpinner.innerHTML = '✓';
+    statusArea.classList.add('status-success');
+    statusArea.classList.remove('status-error');
+  } else if (status === 'error') {
+    statusSpinner.classList.add('error');
+    statusSpinner.innerHTML = '✗';
+    statusArea.classList.add('status-error');
+    statusArea.classList.remove('status-success');
+  } else {
+    statusSpinner.classList.remove('done', 'error');
+    statusSpinner.innerHTML = '';
+    statusArea.classList.remove('status-success', 'status-error');
+  }
+}

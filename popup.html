@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="popup.css">
+  <title>takePDF</title>
+</head>
+<body>
+  <!-- Header section -->
+  <div class="header">
+    <div class="logo-row">
+      <img src="icons/icon48.png" alt="takePDF" class="logo-icon">
+      <h1>takePDF</h1>
+    </div>
+    <p class="tagline">Full-page capture with links</p>
+  </div>
+  
+  <!-- Tab info preview -->
+  <div class="tab-info" id="tabInfo">
+    <img id="tabFavicon" class="tab-favicon" src="" alt="">
+    <div class="tab-details">
+      <span id="tabTitle" class="tab-title">Loading...</span>
+      <span id="tabUrl" class="tab-url"></span>
+    </div>
+  </div>
+  
+  <!-- Main capture buttons -->
+  <div class="capture-section">
+    <button id="capturePdf" class="btn btn-primary">
+      <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+      Capture as PDF
+    </button>
+    <button id="capturePng" class="btn btn-secondary">
+      <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+      Capture as PNG
+    </button>
+    <button id="captureArea" class="btn btn-outline">
+      <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6.13 1L6 16a2 2 0 0 0 2 2h15"></path><path d="M1 6.13L16 6a2 2 0 0 1 2 2v15"></path></svg>
+      Select Area
+    </button>
+  </div>
+  
+  <!-- Options row -->
+  <div class="options-row">
+    <div class="option-group">
+      <label for="delaySelect">Delay</label>
+      <select id="delaySelect" class="select">
+        <option value="0">No delay</option>
+        <option value="3">3 seconds</option>
+        <option value="5">5 seconds</option>
+        <option value="10">10 seconds</option>
+      </select>
+    </div>
+    <div class="option-group">
+      <label class="toggle-label">
+        <input type="checkbox" id="expandToggle" checked>
+        <span class="toggle-slider"></span>
+        Expand code blocks
+      </label>
+    </div>
+    <div class="option-group">
+      <label class="toggle-label">
+        <input type="checkbox" id="clipboardToggle">
+        <span class="toggle-slider"></span>
+        Copy to clipboard
+      </label>
+    </div>
+  </div>
+  
+  <!-- Status area -->
+  <div id="statusArea" class="status-area hidden">
+    <div class="status-spinner" id="statusSpinner"></div>
+    <span id="statusMessage">Preparing...</span>
+  </div>
+  
+  <!-- Footer -->
+  <div class="footer">
+    <button id="settingsBtn" class="footer-btn" title="Settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+    </button>
+    <button id="openLastSaveBtn" class="footer-btn" title="Open last saved file">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+    </button>
+    <span class="version">v1.0.0</span>
+  </div>
+  
+  <script src="popup.js"></script>
+</body>
+</html>

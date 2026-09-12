@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>takePDF Settings</title>
+  <link rel="stylesheet" href="settings.css">
+</head>
+<body>
+  <div class="settings-container">
+    <div class="header">
+      <div class="logo-row">
+        <img src="icons/icon48.png" alt="" class="logo-icon">
+        <h1>takePDF Settings</h1>
+      </div>
+    </div>
+    
+    <div class="section">
+      <h2>Capture Preferences</h2>
+      
+      <div class="setting-row">
+        <label>Default Format</label>
+        <div class="radio-group">
+          <label class="radio-label">
+            <input type="radio" name="format" value="pdf" id="formatPdf">
+            <span class="radio-custom"></span> PDF
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="format" value="png" id="formatPng">
+            <span class="radio-custom"></span> PNG
+          </label>
+        </div>
+      </div>
+      
+      <div class="setting-row">
+        <label for="pngQuality">PNG Quality (<span id="qualityValue">100</span>)</label>
+        <input type="range" id="pngQuality" min="80" max="100" value="100" class="slider">
+      </div>
+      
+      <div class="setting-row">
+        <label for="defaultDelay">Default Capture Delay</label>
+        <select id="defaultDelay" class="select">
+          <option value="0">No delay</option>
+          <option value="3">3 seconds</option>
+          <option value="5">5 seconds</option>
+          <option value="10">10 seconds</option>
+        </select>
+      </div>
+      
+      <div class="setting-row">
+        <label class="toggle-label">
+          <input type="checkbox" id="autoCopyClipboard">
+          <span class="toggle-slider"></span>
+          Auto-copy capture to clipboard
+        </label>
+      </div>
+    </div>
+    
+    <div class="section">
+      <h2>File Output</h2>
+      
+      <div class="setting-row vertical">
+        <label for="filenameTemplate">Filename Template</label>
+        <p class="help-text">Available tokens: {title}, {date}, {timestamp}, {domain}</p>
+        <input type="text" id="filenameTemplate" class="input-text" placeholder="{title}_{date}">
+        <div class="preview-box">
+          Preview: <span id="filenamePreview"></span>
+        </div>
+      </div>
+      
+      <div class="setting-row vertical">
+        <label for="downloadSubfolder">Download Subfolder</label>
+        <p class="help-text">Saves files into this subfolder inside Chrome's download directory. Leave empty for default location.</p>
+        <input type="text" id="downloadSubfolder" class="input-text" placeholder="e.g. takePDF-captures">
+      </div>
+      
+      <div class="setting-row">
+        <label class="toggle-label">
+          <input type="checkbox" id="askSaveLocation">
+          <span class="toggle-slider"></span>
+          Prompt "Save As" dialog each time
+        </label>
+      </div>
+      
+      <div class="setting-row">
+        <button id="openDownloadsBtn" class="btn btn-outline btn-sm">📂 Open Downloads Folder</button>
+        <button id="openLastSaveBtn" class="btn btn-outline btn-sm">📄 Show Last Saved File</button>
+      </div>
+    </div>
+    
+    <div class="section">
+      <h2>Page Processing</h2>
+      
+      <div class="setting-row">
+        <label class="toggle-label">
+          <input type="checkbox" id="expandScrollable">
+          <span class="toggle-slider"></span>
+          Expand scrollable sections
+        </label>
+      </div>
+      
+      <div class="setting-row">
+        <label for="maxScrollDepth">Max Scroll Depth (px)</label>
+        <input type="number" id="maxScrollDepth" class="input-text" min="1000" step="1000">
+      </div>
+      
+      <div class="setting-row">
+        <label class="toggle-label">
+          <input type="checkbox" id="hideScrollbars">
+          <span class="toggle-slider"></span>
+          Hide scrollbars in capture
+        </label>
+      </div>
+      
+      <div class="setting-row">
+        <label class="toggle-label">
+          <input type="checkbox" id="pauseAnimations">
+          <span class="toggle-slider"></span>
+          Pause CSS animations
+        </label>
+      </div>
+      
+      <div class="setting-row">
+        <label class="toggle-label">
+          <input type="checkbox" id="hideCookieBanners">
+          <span class="toggle-slider"></span>
+          Attempt to hide cookie banners
+        </label>
+      </div>
+    </div>
+    
+    <div class="actions">
+      <div id="saveConfirmation" class="save-msg">Settings saved!</div>
+      <button id="resetBtn" class="btn btn-outline">Reset Defaults</button>
+      <button id="saveBtn" class="btn btn-primary">Save Settings</button>
+    </div>
+  </div>
+  
+  <script src="settings.js"></script>
+</body>
+</html>

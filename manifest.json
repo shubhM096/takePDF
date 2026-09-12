@@ -1,0 +1,51 @@
+{
+  "manifest_version": 3,
+  "name": "takePDF",
+  "version": "1.0.0",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "debugger",
+    "downloads",
+    "contextMenus",
+    "storage",
+    "clipboardWrite",
+    "tabs"
+  ],
+  "host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "options_page": "settings.html",
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "commands": {
+    "capture-pdf": {
+      "suggested_key": {
+        "default": "Alt+Shift+P"
+      },
+      "description": "Capture full page as PDF"
+    },
+    "capture-png": {
+      "suggested_key": {
+        "default": "Alt+Shift+S"
+      },
+      "description": "Capture full page as PNG"
+    }
+  },
+  "description": "Capture full web pages as PDF (with hyperlinks) or PNG"
+}
