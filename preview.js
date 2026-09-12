@@ -38,11 +38,12 @@ function renderPreview() {
     // Convert base64 to Blob URL (data: URLs blocked by extension CSP)
     const pdfBlob = base64ToBlob(captureData.base64, 'application/pdf');
     const blobUrl = URL.createObjectURL(pdfBlob);
-    const embed = document.createElement('embed');
-    embed.src = blobUrl;
-    embed.type = 'application/pdf';
-    embed.className = 'preview-embed';
-    previewArea.appendChild(embed);
+    // Use iframe instead of embed — Chrome's PDF viewer works more reliably in iframes
+    const iframe = document.createElement('iframe');
+    iframe.src = blobUrl;
+    iframe.className = 'preview-embed';
+    iframe.setAttribute('allow', 'fullscreen');
+    previewArea.appendChild(iframe);
   } else {
     // Image preview
     sidebar.classList.remove('visible');
