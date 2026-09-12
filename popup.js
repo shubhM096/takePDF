@@ -145,7 +145,7 @@ async function loadRecentCaptures() {
       
       const title = document.createElement('span');
       title.className = 'recent-item-title';
-      title.textContent = cap.title || cap.filename || 'Untitled';
+      title.textContent = cap.filename || cap.title || 'Untitled';
       
       const time = document.createElement('span');
       time.className = 'recent-item-time';
