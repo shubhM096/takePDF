@@ -273,7 +273,7 @@ async function handleCapture(options, providedTab) {
         expression: `((mode) => {
           const s = document.createElement('style');
           s.id = 'takepdf-print-fix';
-          s.textContent = '@page { margin: 0 !important; size: auto !important; }';
+          s.textContent = '@page { margin: 0 !important; size: auto !important; } p, div, li, h1, h2, h3, h4, h5, h6, pre, code, img, table, tr, td, article, section { page-break-inside: avoid !important; break-inside: avoid !important; }';
           document.head.appendChild(s);
           
           if (mode === 'none') return;
@@ -393,6 +393,8 @@ async function handleCapture(options, providedTab) {
         deviceScaleFactor: 1,
         mobile: false
       });
+      // Wait for layout and paint of the new massive viewport!
+      await new Promise(r => setTimeout(r, 800));
       
       const metrics = await chrome.debugger.sendCommand({ tabId }, 'Page.getLayoutMetrics');
       const contentWidth = metrics.cssContentSize ? metrics.cssContentSize.width : metrics.contentSize.width;
@@ -409,7 +411,7 @@ async function handleCapture(options, providedTab) {
         format: format === 'jpeg' ? 'jpeg' : format === 'webp' ? 'webp' : 'png',
         quality: format === 'jpeg' ? (mergedOptions.jpegQuality || 85) : 
                  format === 'webp' ? (mergedOptions.webpQuality || 90) : undefined,
-        captureBeyondViewport: true,
+        captureBeyondViewport: false, // Viewport is already expanded to full height!
         fromSurface: true,
         clip: clipRegion || {
           x: 0,
