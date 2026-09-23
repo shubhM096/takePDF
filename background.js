@@ -393,10 +393,10 @@ async function handleCapture(options, providedTab) {
       // to repeat on each tile), we expand the viewport to the full page size so Chrome renders
       // everything in one shot, then capture with captureBeyondViewport: false.
       
-      // First measure to get initial full page dimensions
-      let metrics = await chrome.debugger.sendCommand({ tabId }, 'Page.getLayoutMetrics');
-      let contentWidth = metrics.cssContentSize ? metrics.cssContentSize.width : metrics.contentSize.width;
-      let contentHeight = metrics.cssContentSize ? metrics.cssContentSize.height : metrics.contentSize.height;
+      // Use dims (from document.scrollHeight, computed earlier) for reliable full page dimensions.
+      // Page.getLayoutMetrics can return only viewport-sized dimensions on some pages.
+      let contentWidth = dims.viewportWidth;
+      let contentHeight = dims.scrollHeight;
       
       // L3 FIX: Cap height at Chrome's max texture size
       if (contentHeight > MAX_PNG_HEIGHT) {
@@ -406,8 +406,8 @@ async function handleCapture(options, providedTab) {
       
       // Expand viewport to full page dimensions — Chrome will render the entire page in one shot
       await chrome.debugger.sendCommand({ tabId }, 'Emulation.setDeviceMetricsOverride', {
-        width: Math.ceil(contentWidth),
-        height: Math.ceil(contentHeight),
+        width: contentWidth,
+        height: contentHeight,
         deviceScaleFactor: 1,
         mobile: false
       });
@@ -432,10 +432,17 @@ async function handleCapture(options, providedTab) {
       // Brief pause for layout to settle after re-flattening
       await new Promise(r => setTimeout(r, 500));
       
-      // Re-measure layout metrics AFTER viewport expansion (content size may have changed)
-      metrics = await chrome.debugger.sendCommand({ tabId }, 'Page.getLayoutMetrics');
-      contentWidth = metrics.cssContentSize ? metrics.cssContentSize.width : metrics.contentSize.width;
-      contentHeight = metrics.cssContentSize ? metrics.cssContentSize.height : metrics.contentSize.height;
+      // Re-measure dimensions AFTER viewport expansion (content size may have changed)
+      const reDimResult = await chrome.debugger.sendCommand({ tabId }, 'Runtime.evaluate', {
+        expression: `JSON.stringify({
+          width: document.documentElement.clientWidth,
+          height: Math.max(document.documentElement.scrollHeight, document.body.scrollHeight)
+        })`,
+        returnByValue: true
+      });
+      const reDims = JSON.parse(reDimResult.result.value);
+      contentWidth = reDims.width;
+      contentHeight = reDims.height;
       
       // Re-apply height cap after re-measure
       if (contentHeight > MAX_PNG_HEIGHT) {
