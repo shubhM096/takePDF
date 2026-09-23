@@ -389,12 +389,11 @@ async function handleCapture(options, providedTab) {
       
     } else {
       // 10b. Image Capture: PNG, JPEG, or WebP
-      // Instead of captureBeyondViewport (which scrolls/stitches tiles and causes sticky elements
-      // to repeat on each tile), we expand the viewport to the full page size so Chrome renders
-      // everything in one shot, then capture with captureBeyondViewport: false.
+      // Sticky/fixed elements are already flattened to position:relative above,
+      // so captureBeyondViewport:true is safe — no elements will repeat on each stitched tile.
+      // We do NOT expand the viewport because sites using height:100vh or complex layouts
+      // (like GeeksForGeeks, Gmail) break when the viewport height is changed.
       
-      // Use dims (from document.scrollHeight, computed earlier) for reliable full page dimensions.
-      // Page.getLayoutMetrics can return only viewport-sized dimensions on some pages.
       let contentWidth = dims.viewportWidth;
       let contentHeight = dims.scrollHeight;
       
@@ -404,57 +403,12 @@ async function handleCapture(options, providedTab) {
         contentHeight = MAX_PNG_HEIGHT;
       }
       
-      // Expand viewport to full page dimensions — Chrome will render the entire page in one shot
-      await chrome.debugger.sendCommand({ tabId }, 'Emulation.setDeviceMetricsOverride', {
-        width: contentWidth,
-        height: contentHeight,
-        deviceScaleFactor: 1,
-        mobile: false
-      });
-      
-      // Chrome needs real time to repaint the massive viewport
-      await new Promise(r => setTimeout(r, 1500));
-      
-      // Re-run sticky element flattening after viewport expansion, since expanding the viewport
-      // can trigger new sticky positions or cause previously-hidden elements to become visible
-      await chrome.debugger.sendCommand({ tabId }, 'Runtime.evaluate', {
-        expression: `(() => {
-          document.querySelectorAll('header, nav, footer, aside, div, section, [role="banner"], [role="navigation"]').forEach(el => {
-            const cs = getComputedStyle(el);
-            if (cs.position !== 'fixed' && cs.position !== 'sticky') return;
-            el.dataset.takepdfOrigPos = el.style.position;
-            el.dataset.takepdfOrigDisplay = el.style.display;
-            el.style.setProperty('position', 'relative', 'important');
-          });
-        })()`
-      });
-      
-      // Brief pause for layout to settle after re-flattening
-      await new Promise(r => setTimeout(r, 500));
-      
-      // Re-measure dimensions AFTER viewport expansion (content size may have changed)
-      const reDimResult = await chrome.debugger.sendCommand({ tabId }, 'Runtime.evaluate', {
-        expression: `JSON.stringify({
-          width: document.documentElement.clientWidth,
-          height: Math.max(document.documentElement.scrollHeight, document.body.scrollHeight)
-        })`,
-        returnByValue: true
-      });
-      const reDims = JSON.parse(reDimResult.result.value);
-      contentWidth = reDims.width;
-      contentHeight = reDims.height;
-      
-      // Re-apply height cap after re-measure
-      if (contentHeight > MAX_PNG_HEIGHT) {
-        contentHeight = MAX_PNG_HEIGHT;
-      }
-      
       const format = mergedOptions.format; // 'png', 'jpeg', or 'webp'
       const captureParams = {
         format: format === 'jpeg' ? 'jpeg' : format === 'webp' ? 'webp' : 'png',
         quality: format === 'jpeg' ? (mergedOptions.jpegQuality || 85) : 
                  format === 'webp' ? (mergedOptions.webpQuality || 90) : undefined,
-        captureBeyondViewport: false,
+        captureBeyondViewport: true,
         fromSurface: true,
         clip: clipRegion || {
           x: 0,
@@ -468,8 +422,17 @@ async function handleCapture(options, providedTab) {
       
       const screenshotResult = await chrome.debugger.sendCommand({ tabId }, 'Page.captureScreenshot', captureParams);
       
-      // Restore viewport to original dimensions
-      await chrome.debugger.sendCommand({ tabId }, 'Emulation.clearDeviceMetricsOverride');
+      // Clean up: restore flattened sticky/fixed elements
+      await chrome.debugger.sendCommand({ tabId }, 'Runtime.evaluate', {
+        expression: `(() => {
+          document.querySelectorAll('[data-takepdf-orig-pos]').forEach(el => {
+            el.style.position = el.dataset.takepdfOrigPos || '';
+            el.style.display = el.dataset.takepdfOrigDisplay || '';
+            delete el.dataset.takepdfOrigPos;
+            delete el.dataset.takepdfOrigDisplay;
+          });
+        })()`
+      });
       
       downloadData = screenshotResult.data;
       mimeType = TakePDFUtils.getMimeType(format);
