@@ -235,17 +235,11 @@ async function handleCapture(options, providedTab) {
     });
     const dims = JSON.parse(dimResult.result.value);
     
-    // Feature 5: Inject temporary styles and handle sticky elements based on stickyHandling mode
-    // We run this for BOTH PDF and Image captures to prevent repeating patterns in Image capture
-    // and overlapping elements in PDF capture.
+    // Feature 5: Flatten sticky/fixed elements for both PDF and Image captures
+    // This prevents repeating headers in image captures and overlapping text in PDF captures.
     const stickyMode = mergedOptions.stickyHandling || 'auto';
     await chrome.debugger.sendCommand({ tabId }, 'Runtime.evaluate', {
       expression: `((mode) => {
-        const s = document.createElement('style');
-        s.id = 'takepdf-print-fix';
-        s.textContent = '@page { margin: 0 !important; size: auto !important; } p, li, h1, h2, h3, h4, h5, h6, pre, code, img, table, tr, td { page-break-inside: avoid !important; break-inside: avoid !important; }';
-        document.head.appendChild(s);
-        
         if (mode === 'none') return;
         
         const vw = window.innerWidth;
@@ -259,24 +253,20 @@ async function handleCapture(options, providedTab) {
           el.dataset.takepdfOrigDisplay = el.style.display;
           
           if (mode === 'hide') {
-            // Hide all fixed/sticky elements
             el.style.setProperty('display', 'none', 'important');
           } else if (mode === 'flatten') {
-            // Convert to relative to keep it in document flow but unstick it
             el.style.setProperty('position', 'relative', 'important');
           } else {
             // 'auto' mode: smart detection
             const rect = el.getBoundingClientRect();
-            const isWide = rect.width > vw * 0.8; // Spans >80% viewport width
-            const isAtEdge = rect.top < 100 || rect.bottom > vh - 100; // Near top/bottom
+            const isWide = rect.width > vw * 0.8;
+            const isAtEdge = rect.top < 100 || rect.bottom > vh - 100;
             const zIndex = parseInt(cs.zIndex) || 0;
             const isOverlay = zIndex > 10;
             
             if (isWide && isAtEdge && isOverlay) {
-              // Likely a header/footer bar — hide it completely
               el.style.setProperty('display', 'none', 'important');
             } else {
-              // Not a header/footer — just flatten position
               el.style.setProperty('position', 'relative', 'important');
             }
           }
@@ -284,12 +274,22 @@ async function handleCapture(options, providedTab) {
       })('${stickyMode}')`
     });
     
-    // Brief pause for layout to settle after styles are injected
+    // Brief pause for layout to settle after flattening sticky elements
     await new Promise(r => setTimeout(r, 300));
     
     if (mergedOptions.format === 'pdf') {
       // 10a. PDF Capture via CDP
       await chrome.debugger.sendCommand({ tabId }, 'Emulation.setEmulatedMedia', { media: 'screen' });
+      
+      // Inject print-specific CSS to avoid breaking text across page boundaries
+      await chrome.debugger.sendCommand({ tabId }, 'Runtime.evaluate', {
+        expression: `(() => {
+          const s = document.createElement('style');
+          s.id = 'takepdf-print-fix';
+          s.textContent = '@page { margin: 0 !important; size: auto !important; } p, li, h1, h2, h3, h4, h5, h6, pre, code, img, table, tr, td { page-break-inside: avoid !important; break-inside: avoid !important; }';
+          document.head.appendChild(s);
+        })()`
+      });
       
       const pageSize = mergedOptions.pdfPageSize || 'continuous';
       
@@ -389,15 +389,56 @@ async function handleCapture(options, providedTab) {
       
     } else {
       // 10b. Image Capture: PNG, JPEG, or WebP
-      // We rely on captureBeyondViewport to scroll and stitch. 
-      // Because we already flattened sticky elements to relative, they will NOT repeat on each stitched tile!
-      const metrics = await chrome.debugger.sendCommand({ tabId }, 'Page.getLayoutMetrics');
-      const contentWidth = metrics.cssContentSize ? metrics.cssContentSize.width : metrics.contentSize.width;
+      // Instead of captureBeyondViewport (which scrolls/stitches tiles and causes sticky elements
+      // to repeat on each tile), we expand the viewport to the full page size so Chrome renders
+      // everything in one shot, then capture with captureBeyondViewport: false.
+      
+      // First measure to get initial full page dimensions
+      let metrics = await chrome.debugger.sendCommand({ tabId }, 'Page.getLayoutMetrics');
+      let contentWidth = metrics.cssContentSize ? metrics.cssContentSize.width : metrics.contentSize.width;
       let contentHeight = metrics.cssContentSize ? metrics.cssContentSize.height : metrics.contentSize.height;
       
-      // L3 FIX: Cap PNG height at Chrome's max texture size
+      // L3 FIX: Cap height at Chrome's max texture size
       if (contentHeight > MAX_PNG_HEIGHT) {
         console.warn(`takePDF: Page height ${contentHeight}px exceeds max PNG height ${MAX_PNG_HEIGHT}px. Capping. Use PDF for full capture.`);
+        contentHeight = MAX_PNG_HEIGHT;
+      }
+      
+      // Expand viewport to full page dimensions — Chrome will render the entire page in one shot
+      await chrome.debugger.sendCommand({ tabId }, 'Emulation.setDeviceMetricsOverride', {
+        width: Math.ceil(contentWidth),
+        height: Math.ceil(contentHeight),
+        deviceScaleFactor: 1,
+        mobile: false
+      });
+      
+      // Chrome needs real time to repaint the massive viewport
+      await new Promise(r => setTimeout(r, 1500));
+      
+      // Re-run sticky element flattening after viewport expansion, since expanding the viewport
+      // can trigger new sticky positions or cause previously-hidden elements to become visible
+      await chrome.debugger.sendCommand({ tabId }, 'Runtime.evaluate', {
+        expression: `(() => {
+          document.querySelectorAll('header, nav, footer, aside, div, section, [role="banner"], [role="navigation"]').forEach(el => {
+            const cs = getComputedStyle(el);
+            if (cs.position !== 'fixed' && cs.position !== 'sticky') return;
+            el.dataset.takepdfOrigPos = el.style.position;
+            el.dataset.takepdfOrigDisplay = el.style.display;
+            el.style.setProperty('position', 'relative', 'important');
+          });
+        })()`
+      });
+      
+      // Brief pause for layout to settle after re-flattening
+      await new Promise(r => setTimeout(r, 500));
+      
+      // Re-measure layout metrics AFTER viewport expansion (content size may have changed)
+      metrics = await chrome.debugger.sendCommand({ tabId }, 'Page.getLayoutMetrics');
+      contentWidth = metrics.cssContentSize ? metrics.cssContentSize.width : metrics.contentSize.width;
+      contentHeight = metrics.cssContentSize ? metrics.cssContentSize.height : metrics.contentSize.height;
+      
+      // Re-apply height cap after re-measure
+      if (contentHeight > MAX_PNG_HEIGHT) {
         contentHeight = MAX_PNG_HEIGHT;
       }
       
@@ -406,7 +447,7 @@ async function handleCapture(options, providedTab) {
         format: format === 'jpeg' ? 'jpeg' : format === 'webp' ? 'webp' : 'png',
         quality: format === 'jpeg' ? (mergedOptions.jpegQuality || 85) : 
                  format === 'webp' ? (mergedOptions.webpQuality || 90) : undefined,
-        captureBeyondViewport: true,
+        captureBeyondViewport: false,
         fromSurface: true,
         clip: clipRegion || {
           x: 0,
@@ -419,6 +460,9 @@ async function handleCapture(options, providedTab) {
       if (captureParams.clip && !captureParams.clip.scale) captureParams.clip.scale = 1;
       
       const screenshotResult = await chrome.debugger.sendCommand({ tabId }, 'Page.captureScreenshot', captureParams);
+      
+      // Restore viewport to original dimensions
+      await chrome.debugger.sendCommand({ tabId }, 'Emulation.clearDeviceMetricsOverride');
       
       downloadData = screenshotResult.data;
       mimeType = TakePDFUtils.getMimeType(format);

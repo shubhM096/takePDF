@@ -150,21 +150,21 @@ describe('Capture via message listener - PDF flow', () => {
 });
 
 describe('Capture via message listener - PNG flow', () => {
-  test('calls Page.captureScreenshot with captureBeyondViewport for PNG', async () => {
+  test('calls Page.captureScreenshot with captureBeyondViewport:false (viewport is expanded)', async () => {
     const sendResponse = jest.fn();
     messageListener({ action: 'capture', format: 'png', mode: 'full' }, {}, sendResponse);
-    await new Promise(r => setTimeout(r, 1200));
+    await new Promise(r => setTimeout(r, 3500));
     expect(chrome.debugger.sendCommand).toHaveBeenCalledWith(
       { tabId: 1 },
       'Page.captureScreenshot',
-      expect.objectContaining({ captureBeyondViewport: true })
+      expect.objectContaining({ captureBeyondViewport: false })
     );
   });
 
   test('downloads PNG via data URI', async () => {
     const sendResponse = jest.fn();
     messageListener({ action: 'capture', format: 'png', mode: 'full' }, {}, sendResponse);
-    await new Promise(r => setTimeout(r, 1200));
+    await new Promise(r => setTimeout(r, 3500));
     expect(chrome.downloads.download).toHaveBeenCalledWith(
       expect.objectContaining({
         url: expect.stringMatching(/^data:image\/png;base64,/),
