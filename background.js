@@ -225,7 +225,42 @@ async function handleCapture(options, providedTab) {
     let mimeType;
     let extension;
     
-    // Get exact viewport dimensions via CDP Runtime (most reliable source)
+    // Feature 5: Flatten sticky/fixed elements for both PDF and Image captures.
+    // This MUST happen BEFORE measuring dimensions, because flattening can change scrollHeight.
+    // Auto mode always flattens (position:relative) — never hides (display:none) — because
+    // hiding removes elements from the flow, causing layout shifts and missing content in captures.
+    const stickyMode = mergedOptions.stickyHandling || 'auto';
+    await chrome.debugger.sendCommand({ tabId }, 'Runtime.evaluate', {
+      expression: `((mode) => {
+        if (mode === 'none') return;
+        
+        document.querySelectorAll('header, nav, footer, aside, div, section, [role="banner"], [role="navigation"]').forEach(el => {
+          const cs = getComputedStyle(el);
+          if (cs.position !== 'fixed' && cs.position !== 'sticky') return;
+          
+          el.dataset.takepdfOrigPos = el.style.position;
+          el.dataset.takepdfOrigTop = el.style.top;
+          el.dataset.takepdfOrigZIndex = el.style.zIndex;
+          
+          if (mode === 'hide') {
+            el.dataset.takepdfOrigDisplay = el.style.display;
+            el.style.setProperty('display', 'none', 'important');
+          } else {
+            // Both 'auto' and 'flatten' modes: convert to relative.
+            // This keeps the element in the document flow at its natural position
+            // but prevents it from sticking/repeating during stitched captures.
+            el.style.setProperty('position', 'relative', 'important');
+            el.style.setProperty('top', 'auto', 'important');
+            el.style.setProperty('z-index', 'auto', 'important');
+          }
+        });
+      })('${stickyMode}')`
+    });
+    
+    // Brief pause for layout to settle after flattening sticky elements
+    await new Promise(r => setTimeout(r, 300));
+    
+    // Measure page dimensions AFTER sticky flattening (flattening can change scrollHeight)
     const dimResult = await chrome.debugger.sendCommand({ tabId }, 'Runtime.evaluate', {
       expression: `JSON.stringify({
         viewportWidth: document.documentElement.clientWidth,
@@ -234,48 +269,6 @@ async function handleCapture(options, providedTab) {
       returnByValue: true
     });
     const dims = JSON.parse(dimResult.result.value);
-    
-    // Feature 5: Flatten sticky/fixed elements for both PDF and Image captures
-    // This prevents repeating headers in image captures and overlapping text in PDF captures.
-    const stickyMode = mergedOptions.stickyHandling || 'auto';
-    await chrome.debugger.sendCommand({ tabId }, 'Runtime.evaluate', {
-      expression: `((mode) => {
-        if (mode === 'none') return;
-        
-        const vw = window.innerWidth;
-        const vh = window.innerHeight;
-        
-        document.querySelectorAll('header, nav, footer, aside, div, section, [role="banner"], [role="navigation"]').forEach(el => {
-          const cs = getComputedStyle(el);
-          if (cs.position !== 'fixed' && cs.position !== 'sticky') return;
-          
-          el.dataset.takepdfOrigPos = el.style.position;
-          el.dataset.takepdfOrigDisplay = el.style.display;
-          
-          if (mode === 'hide') {
-            el.style.setProperty('display', 'none', 'important');
-          } else if (mode === 'flatten') {
-            el.style.setProperty('position', 'relative', 'important');
-          } else {
-            // 'auto' mode: smart detection
-            const rect = el.getBoundingClientRect();
-            const isWide = rect.width > vw * 0.8;
-            const isAtEdge = rect.top < 100 || rect.bottom > vh - 100;
-            const zIndex = parseInt(cs.zIndex) || 0;
-            const isOverlay = zIndex > 10;
-            
-            if (isWide && isAtEdge && isOverlay) {
-              el.style.setProperty('display', 'none', 'important');
-            } else {
-              el.style.setProperty('position', 'relative', 'important');
-            }
-          }
-        });
-      })('${stickyMode}')`
-    });
-    
-    // Brief pause for layout to settle after flattening sticky elements
-    await new Promise(r => setTimeout(r, 300));
     
     if (mergedOptions.format === 'pdf') {
       // 10a. PDF Capture via CDP
@@ -372,10 +365,20 @@ async function handleCapture(options, providedTab) {
         expression: `(() => {
           document.getElementById('takepdf-print-fix')?.remove();
           document.querySelectorAll('[data-takepdf-orig-pos]').forEach(el => {
-            el.style.position = el.dataset.takepdfOrigPos || '';
-            el.style.display = el.dataset.takepdfOrigDisplay || '';
+            // Use removeProperty first to clear any !important flags
+            el.style.removeProperty('position');
+            el.style.removeProperty('display');
+            el.style.removeProperty('top');
+            el.style.removeProperty('z-index');
+            // Re-apply original inline styles if they existed
+            if (el.dataset.takepdfOrigPos) el.style.position = el.dataset.takepdfOrigPos;
+            if (el.dataset.takepdfOrigDisplay) el.style.display = el.dataset.takepdfOrigDisplay;
+            if (el.dataset.takepdfOrigTop) el.style.top = el.dataset.takepdfOrigTop;
+            if (el.dataset.takepdfOrigZIndex) el.style.zIndex = el.dataset.takepdfOrigZIndex;
             delete el.dataset.takepdfOrigPos;
             delete el.dataset.takepdfOrigDisplay;
+            delete el.dataset.takepdfOrigTop;
+            delete el.dataset.takepdfOrigZIndex;
           });
         })()`
       });
@@ -426,10 +429,18 @@ async function handleCapture(options, providedTab) {
       await chrome.debugger.sendCommand({ tabId }, 'Runtime.evaluate', {
         expression: `(() => {
           document.querySelectorAll('[data-takepdf-orig-pos]').forEach(el => {
-            el.style.position = el.dataset.takepdfOrigPos || '';
-            el.style.display = el.dataset.takepdfOrigDisplay || '';
+            el.style.removeProperty('position');
+            el.style.removeProperty('display');
+            el.style.removeProperty('top');
+            el.style.removeProperty('z-index');
+            if (el.dataset.takepdfOrigPos) el.style.position = el.dataset.takepdfOrigPos;
+            if (el.dataset.takepdfOrigDisplay) el.style.display = el.dataset.takepdfOrigDisplay;
+            if (el.dataset.takepdfOrigTop) el.style.top = el.dataset.takepdfOrigTop;
+            if (el.dataset.takepdfOrigZIndex) el.style.zIndex = el.dataset.takepdfOrigZIndex;
             delete el.dataset.takepdfOrigPos;
             delete el.dataset.takepdfOrigDisplay;
+            delete el.dataset.takepdfOrigTop;
+            delete el.dataset.takepdfOrigZIndex;
           });
         })()`
       });
