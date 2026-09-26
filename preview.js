@@ -179,7 +179,9 @@ function setupToolbar() {
 function setZoom(level) {
   currentZoom = Math.max(0.25, Math.min(level, 3.0));
   document.getElementById('zoomLevel').textContent = `${Math.round(currentZoom * 100)}%`;
-  document.getElementById('zoomContainer').style.transform = `scale(${currentZoom})`;
+  const container = document.getElementById('zoomContainer');
+  container.style.zoom = currentZoom;
+  container.style.transform = 'none';
 }
 
 function buildPageSidebar() {

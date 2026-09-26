@@ -301,7 +301,8 @@ async function handleCapture(options, providedTab) {
           s.id = 'takepdf-print-fix';
           s.textContent = '@page { margin: 0 !important; size: auto !important; } ' +
                           'p, li, h1, h2, h3, h4, h5, h6, pre, code, img, table, tr, td { page-break-inside: avoid !important; break-inside: avoid !important; } ' +
-                          'html, body, #__next, #root, #app, #__layout, #qd-content, main, article { height: auto !important; min-height: auto !important; } ' +
+                          'html, body, #__next, #root, #app, #__layout, #qd-content, main, article, ' +
+                          '[class*="min-h-screen"], [class*="min-h-full"], [class*="h-screen"], [class*="h-full"] { height: auto !important; min-height: auto !important; } ' +
                           '[class*="doubtSupport"], #ds-content-container, #ds_activator, [class*="askdoubt"], [class*="singledoubt"], [class*="notesModal"], [class*="notes_modal"], [class*="feedback_modal"], [class*="feedbackModal"], [class*="doubt"][class*="drawer"], [class*="doubt"][class*="modal"], [class*="track_sidebar__eune_"], #track_notes_feature { display: none !important; }';
           document.head.appendChild(s);
         })()`
@@ -327,11 +328,32 @@ async function handleCapture(options, providedTab) {
               maxH = el.scrollHeight;
             }
           });
-          return maxH;
+
+          // Measure true bottom of visible rendered content (text, media, tables, interactive controls, footer)
+          let maxBottom = 0;
+          document.querySelectorAll('body *').forEach(el => {
+            if (['SCRIPT', 'STYLE', 'TEMPLATE', 'NOSCRIPT'].includes(el.tagName)) return;
+            const cs = window.getComputedStyle(el);
+            if (cs.display === 'none' || cs.visibility === 'hidden' || cs.opacity === '0' || cs.position === 'fixed') return;
+
+            const hasDirectText = Array.from(el.childNodes).some(n => n.nodeType === Node.TEXT_NODE && n.textContent.trim().length > 0);
+            const isMediaOrControl = ['IMG', 'SVG', 'CANVAS', 'VIDEO', 'BUTTON', 'INPUT', 'SELECT', 'TEXTAREA', 'TABLE', 'HR', 'FOOTER'].includes(el.tagName);
+            if (!hasDirectText && !isMediaOrControl) return;
+
+            const rect = el.getBoundingClientRect();
+            if (rect.width === 0 || rect.height === 0) return;
+            const b = rect.bottom + window.scrollY;
+            if (b > maxBottom) {
+              maxBottom = b;
+            }
+          });
+
+          return (maxBottom > 200 && maxBottom < maxH) ? Math.ceil(maxBottom + 24) : maxH;
         })()`,
         returnByValue: true
       });
-      const actualContentHeight = heightResult.result.value;
+      const rawHeightVal = heightResult?.result?.value;
+      const actualContentHeight = typeof rawHeightVal === 'number' ? rawHeightVal : (parseFloat(rawHeightVal) || dims.scrollHeight);
 
       const pageSize = mergedOptions.pdfPageSize || 'continuous';
       
@@ -368,11 +390,33 @@ async function handleCapture(options, providedTab) {
                 maxH = el.scrollHeight;
               }
             });
-            return maxH;
+
+            // Measure true bottom of visible rendered content after reflow
+            let maxBottom = 0;
+            document.querySelectorAll('body *').forEach(el => {
+              if (['SCRIPT', 'STYLE', 'TEMPLATE', 'NOSCRIPT'].includes(el.tagName)) return;
+              const cs = window.getComputedStyle(el);
+              if (cs.display === 'none' || cs.visibility === 'hidden' || cs.opacity === '0' || cs.position === 'fixed') return;
+
+              const hasDirectText = Array.from(el.childNodes).some(n => n.nodeType === Node.TEXT_NODE && n.textContent.trim().length > 0);
+              const isMediaOrControl = ['IMG', 'SVG', 'CANVAS', 'VIDEO', 'BUTTON', 'INPUT', 'SELECT', 'TEXTAREA', 'TABLE', 'HR', 'FOOTER'].includes(el.tagName);
+              if (!hasDirectText && !isMediaOrControl) return;
+
+              const rect = el.getBoundingClientRect();
+              if (rect.width === 0 || rect.height === 0) return;
+              const b = rect.bottom + window.scrollY;
+              if (b > maxBottom) {
+                maxBottom = b;
+              }
+            });
+
+            return (maxBottom > 200 && maxBottom < maxH) ? Math.ceil(maxBottom + 24) : maxH;
           })()`,
           returnByValue: true
         });
-        paperHeight = finalHeightResult.result.value / 96;
+        const rawFinalVal = finalHeightResult?.result?.value;
+        const finalContentHeight = typeof rawFinalVal === 'number' ? rawFinalVal : (parseFloat(rawFinalVal) || actualContentHeight);
+        paperHeight = finalContentHeight / 96;
       } else {
         // For standard page sizes (A4/Letter/Legal): set viewport width to
         // match the printable content width so content reflows to fit the page.
