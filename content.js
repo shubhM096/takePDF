@@ -155,60 +155,120 @@
     ]);
   }
 
-  // C2 FIX: Only expand small, self-contained scrollable containers (code blocks, text panels).
-  // NEVER expand structural/layout containers (sidebars, navs, mail lists, SPA shells).
   function expandScrollableContainers() {
     expandedElements = [];
-    
-    // Only check elements likely to be scrollable content containers
-    const scrollableSelector = 'pre, code, .highlight, .code-block, [class*="code"], [class*="snippet"], [class*="output"], table';
+    const scrollableSelector = 'div, section, main, article, aside, nav, pre, code, ul, ol, table, [role="region"], [role="main"], [role="complementary"]';
     const candidates = document.querySelectorAll(scrollableSelector);
+
+    let maxScrollArea = 0;
+    let mainScrollContainer = null;
+
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    // First pass: identify all scrollables and find the main SPA container
+    const scrollables = [];
+
     for (const el of candidates) {
-      // Must actually be scrollable
       if (el.scrollHeight <= el.clientHeight + 5 && el.scrollWidth <= el.clientWidth + 5) continue;
       if (el === document.documentElement || el === document.body) continue;
-      
+
       const style = getComputedStyle(el);
       const overflowY = style.overflowY;
       const overflowX = style.overflowX;
-      
+
       const isScrollableY = (overflowY === 'scroll' || overflowY === 'auto' || overflowY === 'hidden') && el.scrollHeight > el.clientHeight + 5;
       const isScrollableX = (overflowX === 'scroll' || overflowX === 'auto' || overflowX === 'hidden') && el.scrollWidth > el.clientWidth + 5;
-      
+
       if (!isScrollableY && !isScrollableX) continue;
-      
-      // Skip very large containers — these are likely layout/structural elements, not content blocks
-      // A code block or output panel is typically under 5000px when expanded
-      if (el.scrollHeight > 10000) continue;
-      
-      // Skip if expanding would make the container take up more than 50% of viewport height
-      // (unless it's a pre/code element which should always be expanded)
-      const tagName = el.tagName.toLowerCase();
-      const isCodeElement = tagName === 'pre' || tagName === 'code';
-      if (!isCodeElement && el.scrollHeight > window.innerHeight * 0.5) continue;
-      
-      expandedElements.push({
-        element: el,
-        originalOverflow: el.style.overflow,
-        originalOverflowX: el.style.overflowX,
-        originalOverflowY: el.style.overflowY,
-        originalMaxHeight: el.style.maxHeight,
-        originalHeight: el.style.height,
-        originalMaxWidth: el.style.maxWidth
-      });
-      
-      if (isScrollableY) {
-        el.style.overflowY = 'visible';
-        el.style.maxHeight = 'none';
-        el.style.height = 'auto';
+
+      const rect = el.getBoundingClientRect();
+      // Skip off-screen elements horizontally (e.g. hidden sidebars)
+      if (rect.right < 0 || rect.left > viewportWidth) continue;
+      // Skip completely hidden elements
+      if (style.opacity === '0' || style.visibility === 'hidden' || style.display === 'none') continue;
+
+      scrollables.push({ el, style, rect, isScrollableY, isScrollableX });
+
+      // Identify main scroll container for SPAs (largest central scrollable area)
+      if (isScrollableY && style.position !== 'fixed' && style.position !== 'absolute') {
+        const visibleWidth = Math.min(rect.width, viewportWidth);
+        const visibleHeight = Math.min(rect.height, viewportHeight);
+        const area = visibleWidth * visibleHeight;
+
+        if (area > maxScrollArea && visibleWidth > viewportWidth * 0.4 && visibleHeight > viewportHeight * 0.4) {
+           maxScrollArea = area;
+           mainScrollContainer = el;
+        }
       }
-      if (isScrollableX) {
-        el.style.overflowX = 'visible';
-        el.style.maxWidth = 'none';
+    }
+
+    const isBodyScrollable = document.documentElement.scrollHeight > viewportHeight + 100 || document.body.scrollHeight > viewportHeight + 100;
+
+    for (const { el, style, isScrollableY, isScrollableX } of scrollables) {
+      const tagName = el.tagName.toLowerCase();
+      const className = el.className || '';
+      const isCode = tagName === 'pre' || tagName === 'code' || tagName === 'table' || 
+                     (typeof className === 'string' && (className.includes('code') || className.includes('highlight') || className.includes('snippet')));
+
+      let shouldExpand = false;
+      let unlockAncestors = false;
+
+      if (isCode) {
+         shouldExpand = true; // Always expand code blocks
+      } else if (el === mainScrollContainer && !isBodyScrollable) {
+         shouldExpand = true;
+         unlockAncestors = true; // SPA main container: unlock ancestors so body grows
+      } else if (style.position !== 'fixed' && style.position !== 'absolute' && el.scrollHeight < 8000) {
+         shouldExpand = true; // Medium in-flow containers
+      }
+
+      if (shouldExpand) {
+        expandedElements.push({
+          element: el,
+          originalOverflow: el.style.overflow,
+          originalOverflowX: el.style.overflowX,
+          originalOverflowY: el.style.overflowY,
+          originalMaxHeight: el.style.maxHeight,
+          originalHeight: el.style.height,
+          originalMaxWidth: el.style.maxWidth
+        });
+
+        if (isScrollableY) {
+          el.style.setProperty('overflow-y', 'visible', 'important');
+          el.style.setProperty('max-height', 'none', 'important');
+          el.style.setProperty('height', 'auto', 'important');
+        }
+        if (isScrollableX) {
+          el.style.setProperty('overflow-x', 'visible', 'important');
+          el.style.setProperty('max-width', 'none', 'important');
+        }
+
+        if (unlockAncestors) {
+          let parent = el.parentElement;
+          while (parent && parent !== document.body && parent !== document.documentElement) {
+            const pStyle = getComputedStyle(parent);
+            if (pStyle.overflow !== 'visible' || pStyle.overflowY !== 'visible') {
+              expandedElements.push({
+                element: parent,
+                originalOverflow: parent.style.overflow,
+                originalOverflowY: parent.style.overflowY,
+                originalHeight: parent.style.height,
+                originalMaxHeight: parent.style.maxHeight,
+                isAncestorUnlock: true
+              });
+              parent.style.setProperty('overflow', 'visible', 'important');
+              parent.style.setProperty('overflow-y', 'visible', 'important');
+              parent.style.setProperty('height', 'auto', 'important');
+              parent.style.setProperty('max-height', 'none', 'important');
+            }
+            parent = parent.parentElement;
+          }
+        }
       }
     }
     
-    // Check for text truncation (-webkit-line-clamp) — also use narrowed selector
+    // Check for text truncation (-webkit-line-clamp)
     const textContainers = document.querySelectorAll('p, span, div, li, h1, h2, h3, h4, h5, h6, a, td, th');
     for (const el of textContainers) {
       const style = getComputedStyle(el);
@@ -221,8 +281,8 @@
           originalOverflow: el.style.overflow,
           isClamp: true
         });
-        el.style.webkitLineClamp = 'unset';
-        el.style.overflow = 'visible';
+        el.style.setProperty('-webkit-line-clamp', 'unset', 'important');
+        el.style.setProperty('overflow', 'visible', 'important');
       }
     }
     
@@ -253,7 +313,7 @@
       if (style.position === 'fixed' || style.position === 'sticky' || 
           rect.bottom >= window.innerHeight - 10 || rect.top <= 10) {
         const origDisplay = banner.style.display;
-        banner.style.display = 'none';
+        banner.style.setProperty('display', 'none', 'important');
         expandedElements.push({
           element: banner,
           originalDisplay: origDisplay,
@@ -263,17 +323,15 @@
       }
     }
     
-    // L2 R2: Cookie consent modals often set body overflow:hidden to block scrolling.
-    // If we hid banners, check and unlock the body so we capture the full page.
     if (hidCount > 0) {
       const bodyOverflow = getComputedStyle(document.body).overflow;
       if (bodyOverflow === 'hidden') {
         expandedElements.push({
           element: document.body,
           originalOverflow: document.body.style.overflow,
-          isBodyOverflow: true // Dedicated flag — NOT isBanner (which restores display)
+          isBodyOverflow: true
         });
-        document.body.style.overflow = 'visible';
+        document.body.style.setProperty('overflow', 'visible', 'important');
       }
     }
   }
@@ -391,19 +449,38 @@
   function restorePage() {
     for (const item of expandedElements) {
       if (item.isClamp) {
-        item.element.style.webkitLineClamp = item.originalWebkitLineClamp || '';
-        item.element.style.overflow = item.originalOverflow || '';
+        item.element.style.removeProperty('-webkit-line-clamp');
+        item.element.style.removeProperty('overflow');
+        if (item.originalWebkitLineClamp) item.element.style.webkitLineClamp = item.originalWebkitLineClamp;
+        if (item.originalOverflow) item.element.style.overflow = item.originalOverflow;
       } else if (item.isBodyOverflow) {
-        item.element.style.overflow = item.originalOverflow || '';
+        item.element.style.removeProperty('overflow');
+        if (item.originalOverflow) item.element.style.overflow = item.originalOverflow;
       } else if (item.isBanner) {
-        item.element.style.display = item.originalDisplay || '';
+        item.element.style.removeProperty('display');
+        if (item.originalDisplay) item.element.style.display = item.originalDisplay;
+      } else if (item.isAncestorUnlock) {
+        item.element.style.removeProperty('overflow');
+        item.element.style.removeProperty('overflow-y');
+        item.element.style.removeProperty('height');
+        item.element.style.removeProperty('max-height');
+        if (item.originalOverflow) item.element.style.overflow = item.originalOverflow;
+        if (item.originalOverflowY) item.element.style.overflowY = item.originalOverflowY;
+        if (item.originalHeight) item.element.style.height = item.originalHeight;
+        if (item.originalMaxHeight) item.element.style.maxHeight = item.originalMaxHeight;
       } else {
-        item.element.style.overflow = item.originalOverflow || '';
-        item.element.style.overflowX = item.originalOverflowX || '';
-        item.element.style.overflowY = item.originalOverflowY || '';
-        item.element.style.maxHeight = item.originalMaxHeight || '';
-        item.element.style.height = item.originalHeight || '';
-        item.element.style.maxWidth = item.originalMaxWidth || '';
+        item.element.style.removeProperty('overflow');
+        item.element.style.removeProperty('overflow-x');
+        item.element.style.removeProperty('overflow-y');
+        item.element.style.removeProperty('max-height');
+        item.element.style.removeProperty('height');
+        item.element.style.removeProperty('max-width');
+        if (item.originalOverflow) item.element.style.overflow = item.originalOverflow;
+        if (item.originalOverflowX) item.element.style.overflowX = item.originalOverflowX;
+        if (item.originalOverflowY) item.element.style.overflowY = item.originalOverflowY;
+        if (item.originalMaxHeight) item.element.style.maxHeight = item.originalMaxHeight;
+        if (item.originalHeight) item.element.style.height = item.originalHeight;
+        if (item.originalMaxWidth) item.element.style.maxWidth = item.originalMaxWidth;
       }
     }
     expandedElements = [];
