@@ -279,27 +279,21 @@ async function handleCapture(options, providedTab) {
         expression: `(() => {
           const s = document.createElement('style');
           s.id = 'takepdf-print-fix';
-          s.textContent = '@page { margin: 0 !important; size: auto !important; } p, li, h1, h2, h3, h4, h5, h6, pre, code, img, table, tr, td { page-break-inside: avoid !important; break-inside: avoid !important; }';
+          s.textContent = '@page { margin: 0 !important; size: auto !important; } ' +
+                          'p, li, h1, h2, h3, h4, h5, h6, pre, code, img, table, tr, td { page-break-inside: avoid !important; break-inside: avoid !important; } ' +
+                          '@media print { html, body, div[id], main, article, section { height: auto !important; min-height: auto !important; } }';
           document.head.appendChild(s);
-          
-          const vh = window.innerHeight;
-          document.querySelectorAll('*').forEach(el => {
-            const style = window.getComputedStyle(el);
-            const h = parseFloat(style.height);
-            const mh = parseFloat(style.minHeight);
-            if (Math.abs(h - vh) < 2 || Math.abs(mh - vh) < 2) {
-              el.setAttribute('data-takepdf-100vh', 'true');
-              el.style.setProperty('height', 'auto', 'important');
-              el.style.setProperty('min-height', 'auto', 'important');
-            }
-          });
         })()`
       });
       
-      // FIX: Re-measure dimensions AFTER expanding scrollable containers (SPAs like Gmail grow here)
+      // Measure true layout metrics robustly
       const layoutMetrics = await chrome.debugger.sendCommand({ tabId }, 'Page.getLayoutMetrics');
       const actualContentWidth = layoutMetrics.contentSize.width;
-      const actualContentHeight = layoutMetrics.contentSize.height;
+      
+      const heightResult = await chrome.debugger.sendCommand({ tabId }, 'Runtime.evaluate', {
+        expression: 'Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, document.body.offsetHeight, document.documentElement.offsetHeight, document.documentElement.clientHeight)'
+      });
+      const actualContentHeight = heightResult.result.value;
 
       const pageSize = mergedOptions.pdfPageSize || 'continuous';
       
@@ -307,27 +301,18 @@ async function handleCapture(options, providedTab) {
       let paperHeight = actualContentHeight / 96;
       
       if (pageSize === 'continuous') {
-        // H9 FIX: NEVER override viewport height for PDF capture!
-        // Setting a massive viewport height (e.g., 6000px) triggers window resize events
-        // that cause React apps (like LeetCode) or virtualized lists to freak out and
-        // dynamically cull/delete DOM nodes, causing the PDF to cut off midway!
-        // We only override the width to ensure the print layout isn't mobile-optimized.
+        // We MUST override the viewport height for continuous mode!
+        // Virtualized lists rely on window height to know how many DOM nodes to mount.
+        // If we don't stretch it, they remain unmounted and the PDF gets cut off!
         await chrome.debugger.sendCommand({ tabId }, 'Emulation.setDeviceMetricsOverride', {
           width: actualContentWidth,
-          height: 0,
+          height: actualContentHeight,
           deviceScaleFactor: 1,
           mobile: false
         });
         
-        // Let the page reflow after viewport width change
+        // Let the page reflow after viewport height change
         await new Promise(r => setTimeout(r, 200));
-        
-        // Measure the absolute maximum robust scroll height for the paper size,
-        // without relying on Page.getLayoutMetrics which can be fooled by hidden overflows.
-        const heightResult = await chrome.debugger.sendCommand({ tabId }, 'Runtime.evaluate', {
-          expression: 'Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, document.body.offsetHeight, document.documentElement.offsetHeight, document.documentElement.clientHeight)'
-        });
-        paperHeight = heightResult.result.value / 96;
       } else {
         // For standard page sizes (A4/Letter/Legal): set viewport width to
         // match the printable content width so content reflows to fit the page.
@@ -414,11 +399,6 @@ async function handleCapture(options, providedTab) {
             delete el.dataset.takepdfOrigDisplay;
             delete el.dataset.takepdfOrigTop;
             delete el.dataset.takepdfOrigZIndex;
-          });
-          document.querySelectorAll('[data-takepdf-100vh]').forEach(el => {
-            el.style.removeProperty('height');
-            el.style.removeProperty('min-height');
-            el.removeAttribute('data-takepdf-100vh');
           });
         })()`
       });
