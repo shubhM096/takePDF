@@ -279,9 +279,20 @@ async function handleCapture(options, providedTab) {
         expression: `(() => {
           const s = document.createElement('style');
           s.id = 'takepdf-print-fix';
-          s.textContent = '@page { margin: 0 !important; size: auto !important; } p, li, h1, h2, h3, h4, h5, h6, pre, code, img, table, tr, td { page-break-inside: avoid !important; break-inside: avoid !important; } ' +
-                          'html, body, #__next, #root, #app, main, .app-layout { height: auto !important; min-height: auto !important; }';
+          s.textContent = '@page { margin: 0 !important; size: auto !important; } p, li, h1, h2, h3, h4, h5, h6, pre, code, img, table, tr, td { page-break-inside: avoid !important; break-inside: avoid !important; }';
           document.head.appendChild(s);
+          
+          const vh = window.innerHeight;
+          document.querySelectorAll('*').forEach(el => {
+            const style = window.getComputedStyle(el);
+            const h = parseFloat(style.height);
+            const mh = parseFloat(style.minHeight);
+            if (Math.abs(h - vh) < 2 || Math.abs(mh - vh) < 2) {
+              el.setAttribute('data-takepdf-100vh', 'true');
+              el.style.setProperty('height', 'auto', 'important');
+              el.style.setProperty('min-height', 'auto', 'important');
+            }
+          });
         })()`
       });
       
@@ -396,6 +407,11 @@ async function handleCapture(options, providedTab) {
             delete el.dataset.takepdfOrigDisplay;
             delete el.dataset.takepdfOrigTop;
             delete el.dataset.takepdfOrigZIndex;
+          });
+          document.querySelectorAll('[data-takepdf-100vh]').forEach(el => {
+            el.style.removeProperty('height');
+            el.style.removeProperty('min-height');
+            el.removeAttribute('data-takepdf-100vh');
           });
         })()`
       });
