@@ -97,7 +97,7 @@ describe('Capture via message listener - PDF flow', () => {
   test('sets emulated media to screen for PDF', async () => {
     const sendResponse = jest.fn();
     messageListener({ action: 'capture', format: 'pdf', mode: 'full' }, {}, sendResponse);
-    await new Promise(r => setTimeout(r, 700));
+    await new Promise(r => setTimeout(r, 1500));
     expect(chrome.debugger.sendCommand).toHaveBeenCalledWith(
       { tabId: 1 },
       'Emulation.setEmulatedMedia',
@@ -108,7 +108,7 @@ describe('Capture via message listener - PDF flow', () => {
   test('calls Page.getLayoutMetrics for PDF', async () => {
     const sendResponse = jest.fn();
     messageListener({ action: 'capture', format: 'pdf', mode: 'full' }, {}, sendResponse);
-    await new Promise(r => setTimeout(r, 700));
+    await new Promise(r => setTimeout(r, 1500));
     // PDF now uses Runtime.evaluate for viewport dimensions instead of Page.getLayoutMetrics
     expect(chrome.debugger.sendCommand).toHaveBeenCalledWith(
       { tabId: 1 },
@@ -120,7 +120,7 @@ describe('Capture via message listener - PDF flow', () => {
   test('calls Page.printToPDF with correct params', async () => {
     const sendResponse = jest.fn();
     messageListener({ action: 'capture', format: 'pdf', mode: 'full' }, {}, sendResponse);
-    await new Promise(r => setTimeout(r, 700));
+    await new Promise(r => setTimeout(r, 1500));
     expect(chrome.debugger.sendCommand).toHaveBeenCalledWith(
       { tabId: 1 },
       'Page.printToPDF',
@@ -139,7 +139,7 @@ describe('Capture via message listener - PDF flow', () => {
   test('downloads PDF via data URI', async () => {
     const sendResponse = jest.fn();
     messageListener({ action: 'capture', format: 'pdf', mode: 'full' }, {}, sendResponse);
-    await new Promise(r => setTimeout(r, 700));
+    await new Promise(r => setTimeout(r, 1500));
     expect(chrome.downloads.download).toHaveBeenCalledWith(
       expect.objectContaining({
         url: expect.stringMatching(/^data:application\/pdf;base64,/),

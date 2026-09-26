@@ -291,7 +291,8 @@ async function handleCapture(options, providedTab) {
       const actualContentWidth = layoutMetrics.contentSize.width;
       
       const heightResult = await chrome.debugger.sendCommand({ tabId }, 'Runtime.evaluate', {
-        expression: 'Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, document.body.offsetHeight, document.documentElement.offsetHeight, document.documentElement.clientHeight)'
+        expression: 'Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, document.body.offsetHeight, document.documentElement.offsetHeight, document.documentElement.clientHeight)',
+        returnByValue: true
       });
       const actualContentHeight = heightResult.result.value;
 
@@ -312,7 +313,13 @@ async function handleCapture(options, providedTab) {
         });
         
         // Let the page reflow after viewport height change
-        await new Promise(r => setTimeout(r, 200));
+        await new Promise(r => setTimeout(r, 800));
+        
+        const finalHeightResult = await chrome.debugger.sendCommand({ tabId }, 'Runtime.evaluate', {
+          expression: 'Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, document.body.offsetHeight, document.documentElement.offsetHeight, document.documentElement.clientHeight)',
+          returnByValue: true
+        });
+        paperHeight = finalHeightResult.result.value / 96;
       } else {
         // For standard page sizes (A4/Letter/Legal): set viewport width to
         // match the printable content width so content reflows to fit the page.

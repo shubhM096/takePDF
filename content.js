@@ -49,9 +49,6 @@
     // 7. Wait for all images to load (timeout 10s)
     await waitForImages(10000);
     
-    // 8. Scroll back to top
-    window.scrollTo(0, 0);
-    
     // 9. Return metrics
     return {
       success: true,
@@ -71,7 +68,7 @@
     for (const el of candidates) {
       if (el.scrollHeight <= el.clientHeight + 5) continue;
       const style = getComputedStyle(el);
-      if (style.overflowY !== 'scroll' && style.overflowY !== 'auto' && style.overflowY !== 'hidden') continue;
+      if (style.overflowY !== 'scroll' && style.overflowY !== 'auto' && style.overflowY !== 'hidden' && style.overflowY !== 'overlay') continue;
       const rect = el.getBoundingClientRect();
       if (rect.right < 0 || rect.left > vW) continue;
       if (style.opacity === '0' || style.visibility === 'hidden' || style.display === 'none') continue;
@@ -128,8 +125,6 @@
       const percent = Math.min(100, Math.round((currentY / maxDepth) * 100));
       chrome.runtime.sendMessage({ action: 'scrollProgress', percent }).catch(() => {});
     }
-    scrollTarget.scrollTo(0, 0);
-    await new Promise(r => setTimeout(r, 500));
   }
 
   // Feature 4: Wait for a CSS selector to exist on the page
@@ -205,8 +200,8 @@
       const overflowY = style.overflowY;
       const overflowX = style.overflowX;
 
-      const isScrollableY = (overflowY === 'scroll' || overflowY === 'auto' || overflowY === 'hidden') && el.scrollHeight > el.clientHeight + 5;
-      const isScrollableX = (overflowX === 'scroll' || overflowX === 'auto' || overflowX === 'hidden') && el.scrollWidth > el.clientWidth + 5;
+      const isScrollableY = (overflowY === 'scroll' || overflowY === 'auto' || overflowY === 'hidden' || overflowY === 'overlay') && el.scrollHeight > el.clientHeight + 5;
+      const isScrollableX = (overflowX === 'scroll' || overflowX === 'auto' || overflowX === 'hidden' || overflowX === 'overlay') && el.scrollWidth > el.clientWidth + 5;
 
       if (!isScrollableY && !isScrollableX) continue;
 
@@ -518,6 +513,9 @@
     injectedStyles.forEach(el => el.remove());
     
     document.documentElement.style.scrollBehavior = '';
+    
+    // Scroll back to top for the user's convenience after capture
+    window.scrollTo(0, 0);
     
     return { success: true };
   }
