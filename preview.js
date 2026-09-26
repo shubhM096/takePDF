@@ -58,6 +58,7 @@ function renderPreview() {
     // Dynamically import PDF.js
     import('./lib/pdf.min.mjs').then(async (pdfjsLib) => {
       pdfjsLib.GlobalWorkerOptions.workerSrc = './lib/pdf.worker.min.mjs';
+      pdfjsLib.verbosity = 0; // 0 = SILENT, eliminates console warnings in chrome://extensions
       
       const loadingTask = pdfjsLib.getDocument({ data: uint8Array });
       const pdfDoc = await loadingTask.promise;

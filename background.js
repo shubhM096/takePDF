@@ -234,9 +234,29 @@ async function handleCapture(options, providedTab) {
       expression: `((mode) => {
         if (mode === 'none') return;
         
+        const vW = window.innerWidth;
+        const vH = window.innerHeight;
+        
         document.querySelectorAll('header, nav, footer, aside, div, section, [role="banner"], [role="navigation"]').forEach(el => {
           const cs = getComputedStyle(el);
           if (cs.position !== 'fixed' && cs.position !== 'sticky') return;
+          
+          // Skip completely hidden elements
+          if (cs.display === 'none' || cs.visibility === 'hidden' || cs.opacity === '0') return;
+          
+          const rect = el.getBoundingClientRect();
+          // Skip elements that are off-screen
+          if (rect.right <= 0 || rect.left >= vW || rect.bottom <= 0 || rect.top >= vH) return;
+          
+          // Skip sidebars, drawers, modals, doubt boxes, chat widgets, popups
+          const isDrawerOrSidebar = el.closest('aside, [role="complementary"], [class*="doubt"], [class*="sidebar"], [class*="drawer"], [class*="modal"], [class*="chat"], [class*="widget"], [class*="flyout"], [id*="doubt"], [id*="sidebar"], [id*="drawer"], [id*="modal"]');
+          if (isDrawerOrSidebar) return;
+          
+          // Only target true top headers or bottom footers that span across the page
+          const isTopHeader = rect.top <= 50 && rect.width >= vW * 0.45 && rect.height <= vH * 0.35;
+          const isBottomFooter = rect.bottom >= vH - 50 && rect.width >= vW * 0.45 && rect.height <= vH * 0.35;
+          
+          if (!isTopHeader && !isBottomFooter) return;
           
           el.dataset.takepdfOrigPos = el.style.position;
           el.dataset.takepdfOrigTop = el.style.top;
@@ -281,14 +301,14 @@ async function handleCapture(options, providedTab) {
           s.id = 'takepdf-print-fix';
           s.textContent = '@page { margin: 0 !important; size: auto !important; } ' +
                           'p, li, h1, h2, h3, h4, h5, h6, pre, code, img, table, tr, td { page-break-inside: avoid !important; break-inside: avoid !important; } ' +
-                          '@media print { html, body, div[id], main, article, section { height: auto !important; min-height: auto !important; } }';
+                          '@media print { html, body, #__next, #root, #app, #__layout, #qd-content, main, article { height: auto !important; min-height: auto !important; } }';
           document.head.appendChild(s);
         })()`
       });
       
       // Measure true layout metrics robustly
       const layoutMetrics = await chrome.debugger.sendCommand({ tabId }, 'Page.getLayoutMetrics');
-      const actualContentWidth = layoutMetrics.contentSize.width;
+      const actualContentWidth = Math.max(dims.viewportWidth, layoutMetrics.contentSize.width || 0);
       
       const heightResult = await chrome.debugger.sendCommand({ tabId }, 'Runtime.evaluate', {
         expression: 'Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, document.body.offsetHeight, document.documentElement.offsetHeight, document.documentElement.clientHeight)',

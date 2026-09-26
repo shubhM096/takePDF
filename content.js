@@ -70,8 +70,11 @@
       const style = getComputedStyle(el);
       if (style.overflowY !== 'scroll' && style.overflowY !== 'auto' && style.overflowY !== 'hidden' && style.overflowY !== 'overlay') continue;
       const rect = el.getBoundingClientRect();
-      if (rect.right < 0 || rect.left > vW) continue;
+      if (rect.right <= 0 || rect.left >= vW) continue;
       if (style.opacity === '0' || style.visibility === 'hidden' || style.display === 'none') continue;
+      
+      // Skip sidebars, drawers, modals, doubt panels
+      if (el.closest('aside, nav, [role="complementary"], [role="navigation"], [class*="doubt"], [class*="sidebar"], [class*="drawer"], [class*="modal"], [id*="doubt"], [id*="sidebar"], [id*="drawer"]')) continue;
       
       const visibleWidth = Math.min(rect.width, vW);
       const visibleHeight = Math.min(rect.height, vH);
@@ -207,20 +210,21 @@
 
       const rect = el.getBoundingClientRect();
       // Skip off-screen elements horizontally (e.g. hidden sidebars)
-      if (rect.right < 0 || rect.left > viewportWidth) continue;
+      if (rect.right <= 0 || rect.left >= viewportWidth) continue;
       // Skip completely hidden elements
       if (style.opacity === '0' || style.visibility === 'hidden' || style.display === 'none') continue;
 
       scrollables.push({ el, style, rect, isScrollableY, isScrollableX });
 
       // Identify main scroll container for SPAs (largest central scrollable area)
-      // FIX: Gmail's main container is position: absolute! Do not skip absolute elements here.
+      // Never pick sidebars, drawers, modals, or doubt boxes
       if (isScrollableY) {
+        const isExcluded = el.closest('aside, nav, [role="complementary"], [role="navigation"], [class*="doubt"], [class*="sidebar"], [class*="drawer"], [class*="modal"], [id*="doubt"], [id*="sidebar"], [id*="drawer"]');
         const visibleWidth = Math.min(rect.width, viewportWidth);
         const visibleHeight = Math.min(rect.height, viewportHeight);
         const area = visibleWidth * visibleHeight;
 
-        if (area > maxScrollArea && visibleWidth > viewportWidth * 0.4 && visibleHeight > viewportHeight * 0.4) {
+        if (!isExcluded && area > maxScrollArea && visibleWidth > viewportWidth * 0.4 && visibleHeight > viewportHeight * 0.4) {
            maxScrollArea = area;
            mainScrollContainer = el;
         }
@@ -229,7 +233,7 @@
 
     const isBodyScrollable = document.documentElement.scrollHeight > viewportHeight + 100 || document.body.scrollHeight > viewportHeight + 100;
 
-    for (const { el, style, isScrollableY, isScrollableX } of scrollables) {
+    for (const { el, style, rect, isScrollableY, isScrollableX } of scrollables) {
       const tagName = el.tagName.toLowerCase();
       const className = el.className || '';
       const isCode = tagName === 'pre' || tagName === 'code' || tagName === 'table' || 
@@ -238,13 +242,15 @@
       let shouldExpand = false;
       let unlockAncestors = false;
 
+      const isExcluded = el.closest('aside, nav, [role="complementary"], [role="navigation"], [class*="doubt"], [class*="sidebar"], [class*="drawer"], [class*="modal"], [class*="panel"], [class*="popup"], [class*="dialog"], [id*="doubt"], [id*="sidebar"], [id*="drawer"], [id*="modal"]');
+
       if (isCode) {
          shouldExpand = true; // Always expand code blocks
       } else if (el === mainScrollContainer && !isBodyScrollable) {
          shouldExpand = true;
          unlockAncestors = true; // SPA main container: unlock ancestors so body grows
-      } else if (style.position !== 'fixed' && style.position !== 'absolute' && el.scrollHeight < 8000) {
-         shouldExpand = true; // Medium in-flow containers
+      } else if (!isExcluded && style.position !== 'fixed' && style.position !== 'absolute' && el.scrollHeight < 8000 && rect && rect.width > 250) {
+         shouldExpand = true; // Medium in-flow content containers only
       }
 
       if (shouldExpand) {
