@@ -279,7 +279,8 @@ async function handleCapture(options, providedTab) {
         expression: `(() => {
           const s = document.createElement('style');
           s.id = 'takepdf-print-fix';
-          s.textContent = '@page { margin: 0 !important; size: auto !important; } p, li, h1, h2, h3, h4, h5, h6, pre, code, img, table, tr, td { page-break-inside: avoid !important; break-inside: avoid !important; }';
+          s.textContent = '@page { margin: 0 !important; size: auto !important; } p, li, h1, h2, h3, h4, h5, h6, pre, code, img, table, tr, td { page-break-inside: avoid !important; break-inside: avoid !important; } ' +
+                          'html, body, #__next, #root, #app, main, .app-layout { height: auto !important; min-height: auto !important; }';
           document.head.appendChild(s);
         })()`
       });
@@ -291,14 +292,24 @@ async function handleCapture(options, providedTab) {
 
       const pageSize = mergedOptions.pdfPageSize || 'continuous';
       
+      let paperWidth = actualContentWidth / 96;
+      let paperHeight = actualContentHeight / 96;
+      
       if (pageSize === 'continuous') {
-        // Force the viewport to the full page height so Chrome renders everything in one shot
+        // Force the viewport to the full page width/height
         await chrome.debugger.sendCommand({ tabId }, 'Emulation.setDeviceMetricsOverride', {
           width: actualContentWidth,
           height: actualContentHeight,
           deviceScaleFactor: 1,
           mobile: false
         });
+        
+        // Let the page reflow after viewport change
+        await new Promise(r => setTimeout(r, 200));
+        
+        // H8 FIX: Re-measure layout AFTER viewport override to ensure paperHeight perfectly matches any reflowed content
+        const finalMetrics = await chrome.debugger.sendCommand({ tabId }, 'Page.getLayoutMetrics');
+        paperHeight = finalMetrics.contentSize.height / 96;
       } else {
         // For standard page sizes (A4/Letter/Legal): set viewport width to
         // match the printable content width so content reflows to fit the page.
@@ -317,9 +328,6 @@ async function handleCapture(options, providedTab) {
         await new Promise(r => setTimeout(r, 500));
       }
       
-      const paperWidth = actualContentWidth / 96;
-      let paperHeight = actualContentHeight / 96;
-
       // Feature 6 & 10: PDF options (footer, page size)
       const pdfParams = {
         printBackground: true,
