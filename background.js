@@ -249,7 +249,7 @@ async function handleCapture(options, providedTab) {
           if (rect.right <= 0 || rect.left >= vW || rect.bottom <= 0 || rect.top >= vH) return;
           
           // Skip sidebars, drawers, modals, doubt boxes, chat widgets, popups
-          const isDrawerOrSidebar = el.closest('aside, [role="complementary"], [class*="doubt"], [class*="sidebar"], [class*="drawer"], [class*="modal"], [class*="chat"], [class*="widget"], [class*="flyout"], [id*="doubt"], [id*="sidebar"], [id*="drawer"], [id*="modal"]');
+          const isDrawerOrSidebar = el.closest('aside, [role="complementary"], [class*="doubt"], [class*="doubtSupport"], [class*="sidebar"], [class*="drawer"], [class*="modal"], [class*="chat"], [class*="widget"], [class*="flyout"], #ds-content-container, #ds_activator, [id*="doubt"], [id*="sidebar"], [id*="drawer"], [id*="modal"]');
           if (isDrawerOrSidebar) return;
           
           // Only target true top headers or bottom footers that span across the page
@@ -301,10 +301,8 @@ async function handleCapture(options, providedTab) {
           s.id = 'takepdf-print-fix';
           s.textContent = '@page { margin: 0 !important; size: auto !important; } ' +
                           'p, li, h1, h2, h3, h4, h5, h6, pre, code, img, table, tr, td { page-break-inside: avoid !important; break-inside: avoid !important; } ' +
-                          '@media print { ' +
-                          '  html, body, #__next, #root, #app, #__layout, #qd-content, main, article { height: auto !important; min-height: auto !important; } ' +
-                          '  [class*="doubt"][class*="drawer"], [class*="doubt"][class*="modal"], [class*="doubt"][class*="panel"], [class*="doubt"][class*="flyout"], [id*="doubt"][id*="drawer"], [id*="doubt"][id*="modal"] { display: none !important; } ' +
-                          '}';
+                          'html, body, #__next, #root, #app, #__layout, #qd-content, main, article { height: auto !important; min-height: auto !important; } ' +
+                          '[class*="doubtSupport"], #ds-content-container, #ds_activator, [class*="askdoubt"], [class*="singledoubt"], [class*="notesModal"], [class*="notes_modal"], [class*="feedback_modal"], [class*="feedbackModal"], [class*="doubt"][class*="drawer"], [class*="doubt"][class*="modal"], [class*="track_sidebar__eune_"], #track_notes_feature { display: none !important; }';
           document.head.appendChild(s);
         })()`
       });

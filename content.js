@@ -37,10 +37,11 @@
       document.head.appendChild(styleEl);
     }
     
-    // 5. Hide cookie banners if enabled
+    // 5. Hide cookie banners and off-screen drawer widgets
     if (options.hideCookieBanners) {
       hideCookieBanners();
     }
+    hideOffscreenDrawers();
     
     // 6. Pre-scroll to trigger lazy loading
     const maxDepth = options.maxScrollDepth || 50000;
@@ -394,6 +395,41 @@
           isBodyOverflow: true
         });
         document.body.style.setProperty('overflow', 'visible', 'important');
+      }
+    }
+  }
+
+  function hideOffscreenDrawers() {
+    const drawerSelectors = [
+      '[class*="doubtSupport"]',
+      '#ds-content-container',
+      '#ds_activator',
+      '[class*="askdoubt"]',
+      '[class*="singledoubt"]',
+      '[class*="notesModal"]',
+      '[class*="notes_modal"]',
+      '[class*="feedback_modal"]',
+      '[class*="feedbackModal"]',
+      '[class*="track_sidebar__eune_"]',
+      '#track_notes_feature'
+    ];
+    
+    const elements = document.querySelectorAll(drawerSelectors.join(', '));
+    for (const el of elements) {
+      const cs = getComputedStyle(el);
+      const rect = el.getBoundingClientRect();
+      const isOffscreen = rect.right <= 0 || rect.left >= window.innerWidth || (cs.transform && cs.transform.includes('matrix') && rect.left >= window.innerWidth * 0.8);
+      const isFloatingWidget = el.id === 'ds_activator' || (cs.position === 'fixed' && rect.width < 100 && rect.height < 100);
+      const isOverlay = cs.position === 'fixed' && rect.width >= window.innerWidth && rect.height >= window.innerHeight && (cs.backgroundColor.includes('rgba') || parseFloat(cs.opacity) < 1);
+      const isDoubtContainer = (el.className && typeof el.className === 'string' && el.className.includes('doubtSupport')) || el.id === 'ds-content-container' || el.id === 'track_notes_feature';
+
+      if (isOffscreen || isFloatingWidget || isOverlay || isDoubtContainer) {
+        expandedElements.push({
+          element: el,
+          originalDisplay: el.style.display,
+          isBanner: true
+        });
+        el.style.setProperty('display', 'none', 'important');
       }
     }
   }

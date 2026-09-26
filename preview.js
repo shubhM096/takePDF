@@ -60,7 +60,7 @@ function renderPreview() {
       pdfjsLib.GlobalWorkerOptions.workerSrc = './lib/pdf.worker.min.mjs';
       pdfjsLib.verbosity = 0; // 0 = SILENT, eliminates console warnings in chrome://extensions
       
-      const loadingTask = pdfjsLib.getDocument({ data: uint8Array });
+      const loadingTask = pdfjsLib.getDocument({ data: uint8Array, verbosity: 0 });
       const pdfDoc = await loadingTask.promise;
       
       totalPdfPages = pdfDoc.numPages;
