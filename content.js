@@ -64,17 +64,30 @@
   }
 
   // H2 FIX: Update totalHeight as page grows from lazy-loaded content
+  // Also detects SPAs (Gmail, etc.) where the body doesn't scroll — skips lazy loading entirely
   async function triggerLazyLoading(maxDepth) {
     const viewportHeight = window.innerHeight;
-    let totalHeight = Math.min(
-      Math.max(document.documentElement.scrollHeight, document.body.scrollHeight),
-      maxDepth
-    );
+    const bodyScrollHeight = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight);
+    
+    // If the body is barely taller than the viewport, this is likely an SPA
+    // where content scrolls inside internal containers. Don't bother scrolling.
+    if (bodyScrollHeight <= viewportHeight + 100) {
+      return;
+    }
+    
+    let totalHeight = Math.min(bodyScrollHeight, maxDepth);
     let currentY = 0;
     
     while (currentY < totalHeight) {
       window.scrollTo(0, currentY);
       await new Promise(r => setTimeout(r, 300));
+      
+      // Verify scrolling actually worked. If the page didn't scroll, bail out.
+      // This catches SPAs where window.scrollTo is ignored.
+      if (currentY > 0 && window.scrollY < viewportHeight * 0.5) {
+        break;
+      }
+      
       currentY += viewportHeight;
       const newHeight = Math.min(
         Math.max(document.documentElement.scrollHeight, document.body.scrollHeight),
@@ -87,7 +100,7 @@
       const percent = Math.min(100, Math.round((currentY / maxDepth) * 100));
       chrome.runtime.sendMessage({ action: 'scrollProgress', percent }).catch(() => {});
     }
-    window.scrollTo(0, totalHeight);
+    window.scrollTo(0, 0);
     await new Promise(r => setTimeout(r, 500));
   }
 
@@ -142,15 +155,16 @@
     ]);
   }
 
-  // C2 FIX: Narrow selector to typical scrollable containers instead of '*'
+  // C2 FIX: Only expand small, self-contained scrollable containers (code blocks, text panels).
+  // NEVER expand structural/layout containers (sidebars, navs, mail lists, SPA shells).
   function expandScrollableContainers() {
     expandedElements = [];
     
-    // C2: Only check elements likely to be scrollable containers, not every DOM node
-    const scrollableSelector = 'div, section, main, article, aside, nav, pre, code, ul, ol, table, [role="region"], [role="main"], [role="complementary"]';
+    // Only check elements likely to be scrollable content containers
+    const scrollableSelector = 'pre, code, .highlight, .code-block, [class*="code"], [class*="snippet"], [class*="output"], table';
     const candidates = document.querySelectorAll(scrollableSelector);
     for (const el of candidates) {
-      // Pre-filter: skip elements that clearly aren't scrollable (avoids expensive getComputedStyle)
+      // Must actually be scrollable
       if (el.scrollHeight <= el.clientHeight + 5 && el.scrollWidth <= el.clientWidth + 5) continue;
       if (el === document.documentElement || el === document.body) continue;
       
@@ -158,31 +172,39 @@
       const overflowY = style.overflowY;
       const overflowX = style.overflowX;
       
-      const isScrollableY = (overflowY === 'scroll' || overflowY === 'auto') && el.scrollHeight > el.clientHeight + 5;
-      const isScrollableX = (overflowX === 'scroll' || overflowX === 'auto') && el.scrollWidth > el.clientWidth + 5;
+      const isScrollableY = (overflowY === 'scroll' || overflowY === 'auto' || overflowY === 'hidden') && el.scrollHeight > el.clientHeight + 5;
+      const isScrollableX = (overflowX === 'scroll' || overflowX === 'auto' || overflowX === 'hidden') && el.scrollWidth > el.clientWidth + 5;
       
-      if (isScrollableY || isScrollableX) {
-        if (el.scrollHeight > 30000 && el === document.querySelector('main, [role="main"], #content, .content')) continue;
-        
-        expandedElements.push({
-          element: el,
-          originalOverflow: el.style.overflow,
-          originalOverflowX: el.style.overflowX,
-          originalOverflowY: el.style.overflowY,
-          originalMaxHeight: el.style.maxHeight,
-          originalHeight: el.style.height,
-          originalMaxWidth: el.style.maxWidth
-        });
-        
-        if (isScrollableY) {
-          el.style.overflowY = 'visible';
-          el.style.maxHeight = 'none';
-          el.style.height = 'auto';
-        }
-        if (isScrollableX) {
-          el.style.overflowX = 'visible';
-          el.style.maxWidth = 'none';
-        }
+      if (!isScrollableY && !isScrollableX) continue;
+      
+      // Skip very large containers — these are likely layout/structural elements, not content blocks
+      // A code block or output panel is typically under 5000px when expanded
+      if (el.scrollHeight > 10000) continue;
+      
+      // Skip if expanding would make the container take up more than 50% of viewport height
+      // (unless it's a pre/code element which should always be expanded)
+      const tagName = el.tagName.toLowerCase();
+      const isCodeElement = tagName === 'pre' || tagName === 'code';
+      if (!isCodeElement && el.scrollHeight > window.innerHeight * 0.5) continue;
+      
+      expandedElements.push({
+        element: el,
+        originalOverflow: el.style.overflow,
+        originalOverflowX: el.style.overflowX,
+        originalOverflowY: el.style.overflowY,
+        originalMaxHeight: el.style.maxHeight,
+        originalHeight: el.style.height,
+        originalMaxWidth: el.style.maxWidth
+      });
+      
+      if (isScrollableY) {
+        el.style.overflowY = 'visible';
+        el.style.maxHeight = 'none';
+        el.style.height = 'auto';
+      }
+      if (isScrollableX) {
+        el.style.overflowX = 'visible';
+        el.style.maxWidth = 'none';
       }
     }
     
