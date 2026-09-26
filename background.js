@@ -307,20 +307,27 @@ async function handleCapture(options, providedTab) {
       let paperHeight = actualContentHeight / 96;
       
       if (pageSize === 'continuous') {
-        // Force the viewport to the full page width/height
+        // H9 FIX: NEVER override viewport height for PDF capture!
+        // Setting a massive viewport height (e.g., 6000px) triggers window resize events
+        // that cause React apps (like LeetCode) or virtualized lists to freak out and
+        // dynamically cull/delete DOM nodes, causing the PDF to cut off midway!
+        // We only override the width to ensure the print layout isn't mobile-optimized.
         await chrome.debugger.sendCommand({ tabId }, 'Emulation.setDeviceMetricsOverride', {
           width: actualContentWidth,
-          height: actualContentHeight,
+          height: 0,
           deviceScaleFactor: 1,
           mobile: false
         });
         
-        // Let the page reflow after viewport change
+        // Let the page reflow after viewport width change
         await new Promise(r => setTimeout(r, 200));
         
-        // H8 FIX: Re-measure layout AFTER viewport override to ensure paperHeight perfectly matches any reflowed content
-        const finalMetrics = await chrome.debugger.sendCommand({ tabId }, 'Page.getLayoutMetrics');
-        paperHeight = finalMetrics.contentSize.height / 96;
+        // Measure the absolute maximum robust scroll height for the paper size,
+        // without relying on Page.getLayoutMetrics which can be fooled by hidden overflows.
+        const heightResult = await chrome.debugger.sendCommand({ tabId }, 'Runtime.evaluate', {
+          expression: 'Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, document.body.offsetHeight, document.documentElement.offsetHeight, document.documentElement.clientHeight)'
+        });
+        paperHeight = heightResult.result.value / 96;
       } else {
         // For standard page sizes (A4/Letter/Legal): set viewport width to
         // match the printable content width so content reflows to fit the page.
