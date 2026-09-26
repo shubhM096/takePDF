@@ -313,9 +313,8 @@ async function handleCapture(options, providedTab) {
       }
       
       const paperWidth = dims.viewportWidth / 96;
-      const paperHeight = dims.scrollHeight / 96;
+      let paperHeight = dims.scrollHeight / 96;
 
-      
       // Feature 6 & 10: PDF options (footer, page size)
       const pdfParams = {
         printBackground: true,
@@ -328,7 +327,8 @@ async function handleCapture(options, providedTab) {
       // Feature 10: Page size
       if (pageSize === 'continuous') {
         pdfParams.paperWidth = paperWidth;
-        pdfParams.paperHeight = paperHeight;
+        // Add a tiny 0.1 inch buffer to prevent subpixel rounding from spilling into a new page
+        pdfParams.paperHeight = paperHeight + 0.1; 
         pdfParams.marginTop = 0;
         pdfParams.marginBottom = 0;
         pdfParams.marginLeft = 0;
@@ -353,6 +353,8 @@ async function handleCapture(options, providedTab) {
         // Ensure enough margin for footer when in continuous mode
         if (pageSize === 'continuous') {
           pdfParams.marginBottom = 0.4;
+          // Increase paper height to accommodate the margin so content isn't pushed to a new page!
+          pdfParams.paperHeight += 0.4;
         }
       } else {
         pdfParams.displayHeaderFooter = false;

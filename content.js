@@ -63,44 +63,72 @@
     };
   }
 
+  function getSpaScrollContainer() {
+    const candidates = document.querySelectorAll('div, section, main, article, [role="main"]');
+    let maxArea = 0;
+    let mainContainer = null;
+    const vW = window.innerWidth, vH = window.innerHeight;
+    for (const el of candidates) {
+      if (el.scrollHeight <= el.clientHeight + 5) continue;
+      const style = getComputedStyle(el);
+      if (style.overflowY !== 'scroll' && style.overflowY !== 'auto' && style.overflowY !== 'hidden') continue;
+      const rect = el.getBoundingClientRect();
+      if (rect.right < 0 || rect.left > vW) continue;
+      if (style.opacity === '0' || style.visibility === 'hidden' || style.display === 'none') continue;
+      
+      const visibleWidth = Math.min(rect.width, vW);
+      const visibleHeight = Math.min(rect.height, vH);
+      const area = visibleWidth * visibleHeight;
+      if (area > maxArea && area > (vW * vH * 0.2)) {
+        maxArea = area;
+        mainContainer = el;
+      }
+    }
+    return mainContainer;
+  }
+
   // H2 FIX: Update totalHeight as page grows from lazy-loaded content
-  // Also detects SPAs (Gmail, etc.) where the body doesn't scroll — skips lazy loading entirely
+  // Also correctly handles SPAs (Gmail) by scrolling their internal container
   async function triggerLazyLoading(maxDepth) {
     const viewportHeight = window.innerHeight;
-    const bodyScrollHeight = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight);
+    let bodyScrollHeight = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight);
     
-    // If the body is barely taller than the viewport, this is likely an SPA
-    // where content scrolls inside internal containers. Don't bother scrolling.
+    let scrollTarget = window;
+    let getTargetScrollHeight = () => Math.max(document.documentElement.scrollHeight, document.body.scrollHeight);
+    
+    // If body doesn't scroll much, find the SPA internal container to scroll instead
     if (bodyScrollHeight <= viewportHeight + 100) {
-      return;
+      const spaContainer = getSpaScrollContainer();
+      if (spaContainer) {
+        scrollTarget = spaContainer;
+        getTargetScrollHeight = () => spaContainer.scrollHeight;
+      } else {
+        return; // Nothing to scroll
+      }
     }
     
-    let totalHeight = Math.min(bodyScrollHeight, maxDepth);
+    let totalHeight = Math.min(getTargetScrollHeight(), maxDepth);
     let currentY = 0;
     
     while (currentY < totalHeight) {
-      window.scrollTo(0, currentY);
+      scrollTarget.scrollTo(0, currentY);
       await new Promise(r => setTimeout(r, 300));
       
-      // Verify scrolling actually worked. If the page didn't scroll, bail out.
-      // This catches SPAs where window.scrollTo is ignored.
-      if (currentY > 0 && window.scrollY < viewportHeight * 0.5) {
+      // If we are scrolling window but it didn't move, bail to avoid infinite fake loops
+      if (scrollTarget === window && currentY > 0 && window.scrollY < 10) {
         break;
       }
       
       currentY += viewportHeight;
-      const newHeight = Math.min(
-        Math.max(document.documentElement.scrollHeight, document.body.scrollHeight),
-        maxDepth
-      );
+      const newHeight = Math.min(getTargetScrollHeight(), maxDepth);
       if (newHeight > totalHeight) {
-        totalHeight = newHeight; // H2: Track new content loaded by lazy loading
+        totalHeight = newHeight;
       }
       
       const percent = Math.min(100, Math.round((currentY / maxDepth) * 100));
       chrome.runtime.sendMessage({ action: 'scrollProgress', percent }).catch(() => {});
     }
-    window.scrollTo(0, 0);
+    scrollTarget.scrollTo(0, 0);
     await new Promise(r => setTimeout(r, 500));
   }
 
@@ -191,7 +219,8 @@
       scrollables.push({ el, style, rect, isScrollableY, isScrollableX });
 
       // Identify main scroll container for SPAs (largest central scrollable area)
-      if (isScrollableY && style.position !== 'fixed' && style.position !== 'absolute') {
+      // FIX: Gmail's main container is position: absolute! Do not skip absolute elements here.
+      if (isScrollableY) {
         const visibleWidth = Math.min(rect.width, viewportWidth);
         const visibleHeight = Math.min(rect.height, viewportHeight);
         const area = visibleWidth * visibleHeight;
