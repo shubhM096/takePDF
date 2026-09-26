@@ -301,7 +301,10 @@ async function handleCapture(options, providedTab) {
           s.id = 'takepdf-print-fix';
           s.textContent = '@page { margin: 0 !important; size: auto !important; } ' +
                           'p, li, h1, h2, h3, h4, h5, h6, pre, code, img, table, tr, td { page-break-inside: avoid !important; break-inside: avoid !important; } ' +
-                          '@media print { html, body, #__next, #root, #app, #__layout, #qd-content, main, article { height: auto !important; min-height: auto !important; } }';
+                          '@media print { ' +
+                          '  html, body, #__next, #root, #app, #__layout, #qd-content, main, article { height: auto !important; min-height: auto !important; } ' +
+                          '  [class*="doubt"][class*="drawer"], [class*="doubt"][class*="modal"], [class*="doubt"][class*="panel"], [class*="doubt"][class*="flyout"], [id*="doubt"][id*="drawer"], [id*="doubt"][id*="modal"] { display: none !important; } ' +
+                          '}';
           document.head.appendChild(s);
         })()`
       });
@@ -311,7 +314,23 @@ async function handleCapture(options, providedTab) {
       const actualContentWidth = Math.max(dims.viewportWidth, layoutMetrics.contentSize.width || 0);
       
       const heightResult = await chrome.debugger.sendCommand({ tabId }, 'Runtime.evaluate', {
-        expression: 'Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, document.body.offsetHeight, document.documentElement.offsetHeight, document.documentElement.clientHeight)',
+        expression: `(() => {
+          let maxH = Math.max(
+            document.body.scrollHeight,
+            document.documentElement.scrollHeight,
+            document.body.offsetHeight,
+            document.documentElement.offsetHeight,
+            document.documentElement.clientHeight
+          );
+          const candidates = document.querySelectorAll('main, [role="main"], article, #content, .content, [class*="article"], [class*="track"], [class*="container"], [class*="layout"]');
+          candidates.forEach(el => {
+            if (el.closest('aside, nav, [role="complementary"], [class*="doubt"], [class*="sidebar"], [class*="drawer"], [class*="modal"], [id*="doubt"], [id*="sidebar"], [id*="drawer"]')) return;
+            if (el.scrollHeight > maxH) {
+              maxH = el.scrollHeight;
+            }
+          });
+          return maxH;
+        })()`,
         returnByValue: true
       });
       const actualContentHeight = heightResult.result.value;
@@ -336,7 +355,23 @@ async function handleCapture(options, providedTab) {
         await new Promise(r => setTimeout(r, 800));
         
         const finalHeightResult = await chrome.debugger.sendCommand({ tabId }, 'Runtime.evaluate', {
-          expression: 'Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, document.body.offsetHeight, document.documentElement.offsetHeight, document.documentElement.clientHeight)',
+          expression: `(() => {
+            let maxH = Math.max(
+              document.body.scrollHeight,
+              document.documentElement.scrollHeight,
+              document.body.offsetHeight,
+              document.documentElement.offsetHeight,
+              document.documentElement.clientHeight
+            );
+            const candidates = document.querySelectorAll('main, [role="main"], article, #content, .content, [class*="article"], [class*="track"], [class*="container"], [class*="layout"]');
+            candidates.forEach(el => {
+              if (el.closest('aside, nav, [role="complementary"], [class*="doubt"], [class*="sidebar"], [class*="drawer"], [class*="modal"], [id*="doubt"], [id*="sidebar"], [id*="drawer"]')) return;
+              if (el.scrollHeight > maxH) {
+                maxH = el.scrollHeight;
+              }
+            });
+            return maxH;
+          })()`,
           returnByValue: true
         });
         paperHeight = finalHeightResult.result.value / 96;

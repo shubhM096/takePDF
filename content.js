@@ -128,6 +128,11 @@
       const percent = Math.min(100, Math.round((currentY / maxDepth) * 100));
       chrome.runtime.sendMessage({ action: 'scrollProgress', percent }).catch(() => {});
     }
+    
+    // Reset scroll back to top so capture begins from the top of the article
+    scrollTarget.scrollTo(0, 0);
+    window.scrollTo(0, 0);
+    await new Promise(r => setTimeout(r, 400));
   }
 
   // Feature 4: Wait for a CSS selector to exist on the page
@@ -275,22 +280,49 @@
         }
 
         if (unlockAncestors) {
+          // Unlock body and documentElement so the full SPA page can expand
+          expandedElements.push({
+            element: document.body,
+            originalOverflow: document.body.style.overflow,
+            originalOverflowY: document.body.style.overflowY,
+            originalHeight: document.body.style.height,
+            isAncestorUnlock: true
+          });
+          document.body.style.setProperty('overflow', 'visible', 'important');
+          document.body.style.setProperty('overflow-y', 'visible', 'important');
+          document.body.style.setProperty('height', 'auto', 'important');
+
+          expandedElements.push({
+            element: document.documentElement,
+            originalOverflow: document.documentElement.style.overflow,
+            originalOverflowY: document.documentElement.style.overflowY,
+            originalHeight: document.documentElement.style.height,
+            isAncestorUnlock: true
+          });
+          document.documentElement.style.setProperty('overflow', 'visible', 'important');
+          document.documentElement.style.setProperty('overflow-y', 'visible', 'important');
+          document.documentElement.style.setProperty('height', 'auto', 'important');
+
           let parent = el.parentElement;
           while (parent && parent !== document.body && parent !== document.documentElement) {
             const pStyle = getComputedStyle(parent);
-            if (pStyle.overflow !== 'visible' || pStyle.overflowY !== 'visible') {
+            if (pStyle.overflow !== 'visible' || pStyle.overflowY !== 'visible' || pStyle.height !== 'auto') {
               expandedElements.push({
                 element: parent,
                 originalOverflow: parent.style.overflow,
                 originalOverflowY: parent.style.overflowY,
                 originalHeight: parent.style.height,
                 originalMaxHeight: parent.style.maxHeight,
+                originalBottom: parent.style.bottom,
                 isAncestorUnlock: true
               });
               parent.style.setProperty('overflow', 'visible', 'important');
               parent.style.setProperty('overflow-y', 'visible', 'important');
               parent.style.setProperty('height', 'auto', 'important');
               parent.style.setProperty('max-height', 'none', 'important');
+              if (pStyle.position === 'absolute' || pStyle.position === 'fixed') {
+                parent.style.setProperty('bottom', 'auto', 'important');
+              }
             }
             parent = parent.parentElement;
           }
@@ -494,10 +526,12 @@
         item.element.style.removeProperty('overflow-y');
         item.element.style.removeProperty('height');
         item.element.style.removeProperty('max-height');
+        item.element.style.removeProperty('bottom');
         if (item.originalOverflow) item.element.style.overflow = item.originalOverflow;
         if (item.originalOverflowY) item.element.style.overflowY = item.originalOverflowY;
         if (item.originalHeight) item.element.style.height = item.originalHeight;
         if (item.originalMaxHeight) item.element.style.maxHeight = item.originalMaxHeight;
+        if (item.originalBottom) item.element.style.bottom = item.originalBottom;
       } else {
         item.element.style.removeProperty('overflow');
         item.element.style.removeProperty('overflow-x');
