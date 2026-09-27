@@ -260,6 +260,7 @@ async function handleCapture(options, providedTab) {
           
           el.dataset.takepdfOrigPos = el.style.position;
           el.dataset.takepdfOrigTop = el.style.top;
+          el.dataset.takepdfOrigBottom = el.style.bottom;
           el.dataset.takepdfOrigZIndex = el.style.zIndex;
           
           if (mode === 'hide') {
@@ -271,6 +272,7 @@ async function handleCapture(options, providedTab) {
             // but prevents it from sticking/repeating during stitched captures.
             el.style.setProperty('position', 'relative', 'important');
             el.style.setProperty('top', 'auto', 'important');
+            el.style.setProperty('bottom', 'auto', 'important');
             el.style.setProperty('z-index', 'auto', 'important');
           }
         });
@@ -302,7 +304,11 @@ async function handleCapture(options, providedTab) {
           s.textContent = '@page { margin: 0 !important; size: auto !important; } ' +
                           'p, li, h1, h2, h3, h4, h5, h6, pre, code, img, table, tr, td { page-break-inside: avoid !important; break-inside: avoid !important; } ' +
                           'html, body, #__next, #root, #app, #__layout, #qd-content, main, article, ' +
-                          '[class*="min-h-screen"], [class*="min-h-full"], [class*="h-screen"], [class*="h-full"] { height: auto !important; min-height: auto !important; } ' +
+                          '[class*="min-h-"], [class*="h-screen"], [class*="h-full"], [class*="h-dvh"], [class*="h-svh"], [class*="h-lvh"], ' +
+                          '[style*="min-height"], [style*="height: 100vh"], [style*="height: 100%"] { height: auto !important; min-height: auto !important; } ' +
+                          'footer, [class*="footer"], [role="contentinfo"] { margin-top: 0 !important; } ' +
+                          '[class*="justify-between"], [class*="justify-space-between"] { justify-content: flex-start !important; } ' +
+                          '.flex.h-full.flex-col, [class*="flex-1"], [class*="grow"], [class*="flex-grow"], [class*="flex-fill"] { height: auto !important; min-height: auto !important; } ' +
                           '[class*="doubtSupport"], #ds-content-container, #ds_activator, [class*="askdoubt"], [class*="singledoubt"], [class*="notesModal"], [class*="notes_modal"], [class*="feedback_modal"], [class*="feedbackModal"], [class*="doubt"][class*="drawer"], [class*="doubt"][class*="modal"], [class*="track_sidebar__eune_"], #track_notes_feature { display: none !important; }';
           document.head.appendChild(s);
         })()`
@@ -336,6 +342,9 @@ async function handleCapture(options, providedTab) {
             const cs = window.getComputedStyle(el);
             if (cs.display === 'none' || cs.visibility === 'hidden' || cs.opacity === '0' || cs.position === 'fixed') return;
 
+            const isDrawerOrWidget = el.closest('aside, [role="complementary"], [class*="doubt"], [class*="doubtSupport"], [class*="drawer"], [class*="modal"], [class*="chat"], [class*="widget"], [class*="flyout"], #ds-content-container, #ds_activator, [id*="doubt"], [id*="drawer"], [id*="modal"]');
+            if (isDrawerOrWidget) return;
+
             const hasDirectText = Array.from(el.childNodes).some(n => n.nodeType === Node.TEXT_NODE && n.textContent.trim().length > 0);
             const isMediaOrControl = ['IMG', 'SVG', 'CANVAS', 'VIDEO', 'BUTTON', 'INPUT', 'SELECT', 'TEXTAREA', 'TABLE', 'HR', 'FOOTER'].includes(el.tagName);
             if (!hasDirectText && !isMediaOrControl) return;
@@ -348,7 +357,7 @@ async function handleCapture(options, providedTab) {
             }
           });
 
-          return (maxBottom > 200 && maxBottom < maxH) ? Math.ceil(maxBottom + 24) : maxH;
+          return (maxBottom > 200) ? Math.ceil(maxBottom + 24) : maxH;
         })()`,
         returnByValue: true
       });
@@ -398,6 +407,9 @@ async function handleCapture(options, providedTab) {
               const cs = window.getComputedStyle(el);
               if (cs.display === 'none' || cs.visibility === 'hidden' || cs.opacity === '0' || cs.position === 'fixed') return;
 
+              const isDrawerOrWidget = el.closest('aside, [role="complementary"], [class*="doubt"], [class*="doubtSupport"], [class*="drawer"], [class*="modal"], [class*="chat"], [class*="widget"], [class*="flyout"], #ds-content-container, #ds_activator, [id*="doubt"], [id*="drawer"], [id*="modal"]');
+              if (isDrawerOrWidget) return;
+
               const hasDirectText = Array.from(el.childNodes).some(n => n.nodeType === Node.TEXT_NODE && n.textContent.trim().length > 0);
               const isMediaOrControl = ['IMG', 'SVG', 'CANVAS', 'VIDEO', 'BUTTON', 'INPUT', 'SELECT', 'TEXTAREA', 'TABLE', 'HR', 'FOOTER'].includes(el.tagName);
               if (!hasDirectText && !isMediaOrControl) return;
@@ -410,7 +422,7 @@ async function handleCapture(options, providedTab) {
               }
             });
 
-            return (maxBottom > 200 && maxBottom < maxH) ? Math.ceil(maxBottom + 24) : maxH;
+            return (maxBottom > 200) ? Math.ceil(maxBottom + 24) : maxH;
           })()`,
           returnByValue: true
         });
@@ -493,15 +505,18 @@ async function handleCapture(options, providedTab) {
             el.style.removeProperty('position');
             el.style.removeProperty('display');
             el.style.removeProperty('top');
+            el.style.removeProperty('bottom');
             el.style.removeProperty('z-index');
             // Re-apply original inline styles if they existed
             if (el.dataset.takepdfOrigPos) el.style.position = el.dataset.takepdfOrigPos;
             if (el.dataset.takepdfOrigDisplay) el.style.display = el.dataset.takepdfOrigDisplay;
             if (el.dataset.takepdfOrigTop) el.style.top = el.dataset.takepdfOrigTop;
+            if (el.dataset.takepdfOrigBottom) el.style.bottom = el.dataset.takepdfOrigBottom;
             if (el.dataset.takepdfOrigZIndex) el.style.zIndex = el.dataset.takepdfOrigZIndex;
             delete el.dataset.takepdfOrigPos;
             delete el.dataset.takepdfOrigDisplay;
             delete el.dataset.takepdfOrigTop;
+            delete el.dataset.takepdfOrigBottom;
             delete el.dataset.takepdfOrigZIndex;
           });
         })()`
@@ -556,14 +571,17 @@ async function handleCapture(options, providedTab) {
             el.style.removeProperty('position');
             el.style.removeProperty('display');
             el.style.removeProperty('top');
+            el.style.removeProperty('bottom');
             el.style.removeProperty('z-index');
             if (el.dataset.takepdfOrigPos) el.style.position = el.dataset.takepdfOrigPos;
             if (el.dataset.takepdfOrigDisplay) el.style.display = el.dataset.takepdfOrigDisplay;
             if (el.dataset.takepdfOrigTop) el.style.top = el.dataset.takepdfOrigTop;
+            if (el.dataset.takepdfOrigBottom) el.style.bottom = el.dataset.takepdfOrigBottom;
             if (el.dataset.takepdfOrigZIndex) el.style.zIndex = el.dataset.takepdfOrigZIndex;
             delete el.dataset.takepdfOrigPos;
             delete el.dataset.takepdfOrigDisplay;
             delete el.dataset.takepdfOrigTop;
+            delete el.dataset.takepdfOrigBottom;
             delete el.dataset.takepdfOrigZIndex;
           });
         })()`
